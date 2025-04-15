@@ -193,10 +193,10 @@ st.sidebar.header("Gerenciamento de Localidades")
 col1, col2 = st.sidebar.columns(2)
 with col1:
     if st.sidebar.button("Cadastrar Nova Localidade", key="btn_cadastrar"):
-        st.switch_page("pagess/wind_pages/cadastro_localidade.py")
+        st.switch_page("pages/cadastro_localidade.py")
 with col2:
     if st.sidebar.button("Listar Localidades", key="btn_listar"):
-        st.switch_page("pagess/wind_pages/listar_localidades.py")
+        st.switch_page("pages/listar_localidades.py")
 
 # Adicionar informações sobre o projeto
 st.sidebar.markdown("---")

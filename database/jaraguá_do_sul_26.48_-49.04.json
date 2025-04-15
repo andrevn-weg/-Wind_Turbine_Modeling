@@ -1,0 +1,11 @@
+{
+    "nome": "Jaraguá do Sul",
+    "latitude": 26.4812998,
+    "longitude": -49.0429592,
+    "velocidade_media": 6.5,
+    "altura_referencia": 50,
+    "topologia_terreno": "Liso, gelo, lama",
+    "fonte_dados": null,
+    "ultima_atualizacao": null,
+    "data_cadastro": "2025-04-15T18:25:30.073722"
+}
