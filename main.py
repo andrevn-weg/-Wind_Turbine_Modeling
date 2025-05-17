@@ -1,9 +1,19 @@
+from pathlib import Path
 import streamlit as st
 import os
 import sys
 import pandas as pd
 from PIL import Image
 import importlib
+
+
+# Import CSS loader
+from utils.css_loader import load_css
+
+# # Load centralized CSS
+# project_root = Path(__file__).parent.parent
+# css_path = os.path.join(project_root, "static", "styles.css")
+# load_css(css_path)
 
 def main():
     # Configuração da página
@@ -14,38 +24,20 @@ def main():
         initial_sidebar_state="expanded"
     )
     
-    # Aplicar estilo personalizado
-    st.markdown("""
-    <style>
-        .title {
-            font-size: 36px !important;
-            font-weight: bold;
-        }
-        .subtitle {
-            font-size: 22px !important;
-            font-style: italic;
-            color: #4F4F4F;
-        }
-        .header {
-            font-size: 24px !important;
-            font-weight: bold;
-            margin-top: 20px;
-        }
-        .subheader {
-            font-size: 20px !important;
-            font-weight: bold;
-            margin-top: 10px;
-        }
-        hr {
-            margin-top: 15px;
-            margin-bottom: 15px;
-        }
-    </style>
-    """, unsafe_allow_html=True)
+    # Load centralized CSS
+    project_root = Path(__file__).parent.parent
+    css_path = os.path.join(project_root, "static", "styles.css")
+    load_css(css_path)
     
-    # Título e subtítulo
-    st.markdown('<p class="title">Simulador de Turbina Eólica de Velocidade Variável</p>', unsafe_allow_html=True)
-    st.markdown('<p class="subtitle">Modelagem e Análise de Componentes de Turbinas Eólicas</p>', unsafe_allow_html=True)
+    
+    
+      # Título e subtítulo
+    st.markdown("""
+    <div class="page-main-header">
+        <h1>Simulador de <span style="color: rgb(219 123 52); text-shadow: 2px 2px 4px rgba(0,0,0,0.3); font-weight: bold;">Turbina Eólica</span></h1>
+        <p>Modelagem e Análise de Componentes de Turbinas Eólicas</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     st.markdown("---")
     
@@ -65,21 +57,32 @@ def main():
     elif escolha == "Simulador de Turbina":
         abrir_simulador()
     
-def mostrar_pagina_inicial():
-    # Seção de objetivos
-    st.markdown('<p class="header">Objetivos do Projeto</p>', unsafe_allow_html=True)
+def mostrar_pagina_inicial():    # Seção de objetivos
+    st.markdown("""
+    <div class="section-header">
+        <h4>🎯 Objetivos do Projeto</h4>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Objetivo geral
-    st.markdown('<p class="subheader">Objetivo Geral:</p>', unsafe_allow_html=True)
-    st.markdown(
-        """
-        Desenvolver um simulador de turbina eólica de velocidade variável, além de um sistema de supervisão
-        que possibilite testar a turbina em diferentes regimes de vento e pontos de operação.
-        """
-    )
+    st.markdown("""
+    <div class="section-header-minor">
+        <h4>Objetivo Geral</h4>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Objetivos específicos
-    st.markdown('<p class="subheader">Objetivos Específicos:</p>', unsafe_allow_html=True)
+    st.markdown("""
+    <div class="detail-container">
+    <p>Desenvolver um simulador de turbina eólica de velocidade variável, além de um sistema de supervisão
+    que possibilite testar a turbina em diferentes regimes de vento e pontos de operação.</p>
+    </div>
+    """, unsafe_allow_html=True)
+      # Objetivos específicos
+    st.markdown("""
+    <div class="thermal-section">
+        <h4>Objetivos Específicos</h4>
+    </div>
+    """, unsafe_allow_html=True)
     
     objectives = [
         "Revisão da literatura sobre sistemas de conversão eólica.",
@@ -91,13 +94,27 @@ def mostrar_pagina_inicial():
         "Avaliação do desempenho do sistema de emulação em diferentes cenários operacionais."
     ]
     
+    st.markdown("""
+    <div class="detail-container">
+        <ul style="list-style-type: none; padding-left: 0;">
+    """, unsafe_allow_html=True)
+    
     for i, obj in enumerate(objectives, 1):
-        st.markdown(f"{i}. {obj}")
+        st.markdown(f"""
+        <li style="padding: 10px 0; border-bottom: 1px solid #eee;">
+            <b>{i}.</b> {obj}
+        </li>
+        """, unsafe_allow_html=True)
     
-    st.markdown("---")
+    st.markdown("</ul></div>", unsafe_allow_html=True)
     
-    # Seção de contexto
-    st.markdown('<p class="header">Contexto e Motivação</p>', unsafe_allow_html=True)
+
+      # Seção de contexto
+    st.markdown("""
+    <div class="section-header">
+        <h4>🌍 Contexto e Motivação</h4>
+    </div>
+    """, unsafe_allow_html=True)
     
     context_text = (
         """
@@ -118,10 +135,18 @@ def mostrar_pagina_inicial():
         """
     )
     
-    st.markdown(context_text)
+    st.markdown(f"""
+    <div class="detail-container">
+        {context_text}
+    </div>
+    """, unsafe_allow_html=True)
 
 def abrir_cadastro_localidade():
-    st.title("Cadastrar Localidade")
+    st.markdown("""
+    <div class="page-main-header">
+        <h1>Cadastrar <span style="color: rgb(219 123 52); text-shadow: 2px 2px 4px rgba(0,0,0,0.3); font-weight: bold;">Localidade</span></h1>
+    </div>
+    """, unsafe_allow_html=True)
     
     try:
         # Tentativa de importar o módulo de cadastro
@@ -150,7 +175,11 @@ def abrir_cadastro_localidade():
         st.error(f"Erro ao carregar módulo de cadastro: {e}")
 
 def abrir_listar_localidades():
-    st.title("Listar Localidades")
+    st.markdown("""
+    <div class="page-main-header">
+        <h1>Listar <span style="color: rgb(219 123 52); text-shadow: 2px 2px 4px rgba(0,0,0,0.3); font-weight: bold;">Localidades</span></h1>
+    </div>
+    """, unsafe_allow_html=True)
     
     try:
         # Tentativa de importar o módulo de listagem
@@ -179,8 +208,18 @@ def abrir_listar_localidades():
         st.error(f"Erro ao carregar módulo de listagem: {e}")
 
 def abrir_simulador():
-    st.title("Simulador de Turbina Eólica")
-    st.info("O módulo de simulação está em desenvolvimento.")
+    st.markdown("""
+    <div class="page-main-header">
+        <h1>Simulador de <span style="color: rgb(219 123 52); text-shadow: 2px 2px 4px rgba(0,0,0,0.3); font-weight: bold;">Turbina Eólica</span></h1>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="info-notice">
+        <h4>Aviso</h4>
+        <p>O módulo de simulação está em desenvolvimento.</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Exemplo de interface para o futuro simulador
     st.subheader("Parâmetros da Simulação")
