@@ -2,6 +2,9 @@ import sqlite3
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from math import cos, radians
+
+
 
 
 @dataclass
@@ -12,14 +15,22 @@ class Cidade:
     Attributes:
         id (Optional[int]): Identificador único da cidade no banco de dados
         nome (str): Nome da cidade/localidade
+        regiao_id (Optional[int]): Referência à região/estado (chave estrangeira)
+        pais_id (Optional[int]): Referência direta ao país (chave estrangeira)
         latitude (float): Latitude geográfica
         longitude (float): Longitude geográfica
+        populacao (Optional[int]): População estimada da cidade
+        altitude (Optional[float]): Altitude média em metros
         notes (Optional[str]): Notas adicionais sobre a cidade/localidade
     """
     id: Optional[int] = None
     nome: str = ""
+    regiao_id: Optional[int] = None
+    pais_id: Optional[int] = None
     latitude: float = 0.0
     longitude: float = 0.0
+    populacao: Optional[int] = None
+    altitude: Optional[float] = None
     notes: Optional[str] = None
     
     def __repr__(self) -> str:
@@ -30,8 +41,12 @@ class Cidade:
         return {
             "id": self.id,
             "nome": self.nome,
+            "regiao_id": self.regiao_id,
+            "pais_id": self.pais_id,
             "latitude": self.latitude,
             "longitude": self.longitude,
+            "populacao": self.populacao,
+            "altitude": self.altitude,
             "notes": self.notes
         }
     
@@ -41,8 +56,12 @@ class Cidade:
         return cls(
             id=data.get("id"),
             nome=data.get("nome", ""),
+            regiao_id=data.get("regiao_id"),
+            pais_id=data.get("pais_id"),
             latitude=data.get("latitude", 0.0),
             longitude=data.get("longitude", 0.0),
+            populacao=data.get("populacao"),
+            altitude=data.get("altitude"),
             notes=data.get("notes")
         )
 
@@ -84,9 +103,15 @@ class CidadeModel:
             CREATE TABLE IF NOT EXISTS cidades (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 nome TEXT NOT NULL,
+                regiao_id INTEGER,
+                pais_id INTEGER,
                 latitude REAL NOT NULL,
                 longitude REAL NOT NULL,
-                notes TEXT
+                populacao INTEGER,
+                altitude REAL,
+                notes TEXT,
+                FOREIGN KEY (regiao_id) REFERENCES regioes (id),
+                FOREIGN KEY (pais_id) REFERENCES paises (id)
             )
             ''')
             self.conn.commit()
@@ -106,9 +131,9 @@ class CidadeModel:
         try:
             self._conectar()
             self.cursor.execute('''
-            INSERT INTO cidades (nome, latitude, longitude, notes)
-            VALUES (?, ?, ?, ?)
-            ''', (cidade.nome, cidade.latitude, cidade.longitude, cidade.notes))
+            INSERT INTO cidades (nome, regiao_id, pais_id, latitude, longitude, populacao, altitude, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (cidade.nome, cidade.regiao_id, cidade.pais_id, cidade.latitude, cidade.longitude, cidade.populacao, cidade.altitude, cidade.notes))
             self.conn.commit()
             # Retorna o ID da cidade inserida
             cidade_id = self.cursor.lastrowid
@@ -135,9 +160,13 @@ class CidadeModel:
                 return Cidade(
                     id=resultado[0],
                     nome=resultado[1],
-                    latitude=resultado[2],
-                    longitude=resultado[3],
-                    notes=resultado[4]
+                    regiao_id=resultado[2],
+                    pais_id=resultado[3],
+                    latitude=resultado[4],
+                    longitude=resultado[5],
+                    populacao=resultado[6],
+                    altitude=resultado[7],
+                    notes=resultado[8]
                 )
             return None
         finally:
@@ -163,9 +192,13 @@ class CidadeModel:
                 cidade = Cidade(
                     id=resultado[0],
                     nome=resultado[1],
-                    latitude=resultado[2],
-                    longitude=resultado[3],
-                    notes=resultado[4]
+                    regiao_id=resultado[2],
+                    pais_id=resultado[3],
+                    latitude=resultado[4],
+                    longitude=resultado[5],
+                    populacao=resultado[6],
+                    altitude=resultado[7],
+                    notes=resultado[8]
                 )
                 cidades.append(cidade)
             
@@ -190,9 +223,13 @@ class CidadeModel:
                 cidade = Cidade(
                     id=resultado[0],
                     nome=resultado[1],
-                    latitude=resultado[2],
-                    longitude=resultado[3],
-                    notes=resultado[4]
+                    regiao_id=resultado[2],
+                    pais_id=resultado[3],
+                    latitude=resultado[4],
+                    longitude=resultado[5],
+                    populacao=resultado[6],
+                    altitude=resultado[7],
+                    notes=resultado[8]
                 )
                 cidades.append(cidade)
             
@@ -217,9 +254,9 @@ class CidadeModel:
             self._conectar()
             self.cursor.execute('''
             UPDATE cidades
-            SET nome = ?, latitude = ?, longitude = ?, notes = ?
+            SET nome = ?, regiao_id = ?, pais_id = ?, latitude = ?, longitude = ?, populacao = ?, altitude = ?, notes = ?
             WHERE id = ?
-            ''', (cidade.nome, cidade.latitude, cidade.longitude, cidade.notes, cidade.id))
+            ''', (cidade.nome, cidade.regiao_id, cidade.pais_id, cidade.latitude, cidade.longitude, cidade.populacao, cidade.altitude, cidade.notes, cidade.id))
             self.conn.commit()
             
             # Verifica se alguma linha foi afetada
@@ -282,16 +319,16 @@ class CidadeModel:
                 cidade = Cidade(
                     id=resultado[0],
                     nome=resultado[1],
-                    latitude=resultado[2],
-                    longitude=resultado[3],
-                    notes=resultado[4]
+                    regiao_id=resultado[2],
+                    pais_id=resultado[3],
+                    latitude=resultado[4],
+                    longitude=resultado[5],
+                    populacao=resultado[6],
+                    altitude=resultado[7],
+                    notes=resultado[8]
                 )
                 cidades.append(cidade)
             
             return cidades
         finally:
             self._desconectar()
-
-
-# Adiciona importação para a função cos e radians usada no método buscar_proximas
-from math import cos, radians
