@@ -1,0 +1,47 @@
+# Dependências do Sistema de Simulação de Turbinas Eólicas
+# bibliotecas desatualizadas
+# Framework principal
+streamlit>=1.46.1
+
+# Manipulação de dados
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Visualização
+matplotlib>=3.7.0
+plotly>=5.15.0
+seaborn>=0.12.0
+
+# Imagens
+Pillow>=10.0.0
+
+# APIs e requisições
+requests>=2.31.0
+urllib3>=2.0.0
+
+# Banco de dados
+sqlite3  # Incluído no Python padrão
+
+# Utilitários de data/hora
+python-dateutil>=2.8.0
+
+# Análise científica (para modelagem de turbinas)
+scipy>=1.11.0
+
+# Processamento de coordenadas geográficas
+geopy>=2.3.0
+
+# Para APIs meteorológicas
+httpx>=0.24.0
+
+# Desenvolvimento e testes
+pytest>=7.4.0
+black>=23.7.0
+flake8>=6.0.0
+
+# Documentação
+mkdocs>=1.5.0
+mkdocs-material>=9.0.0
+
+# Para trabalhar com paths
+pathlib2>=2.3.7
