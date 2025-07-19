@@ -22,8 +22,14 @@ from web.pages.cadastro_geographic import create_pais, create_estado, create_cid
 
 
 # Título principal
-st.title("📍 Cadastro de Localidades")
-st.markdown("Sistema para cadastro de dados geográficos: países, estados e cidades")
+# st.title("📍 Cadastro de Localidades")
+st.markdown("""
+            <div class="page-main-header">
+            <h1>📍 Cadastro de Localidades </h1>
+            <p>Gerencie países, estados e cidades de forma simples e eficiente</p>
+            </div>
+            """, unsafe_allow_html=True)
+# st.markdown("Sistema para cadastro de dados geográficos: países, estados e cidades")
 
 # Sidebar com informações
 st.sidebar.header("ℹ️ Informações")

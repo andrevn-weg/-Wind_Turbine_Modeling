@@ -80,7 +80,11 @@ def create_map_from_cities(cidades):
 
 def show_statistics():
     """Exibe estatísticas resumidas do sistema"""
-    st.markdown("### 📊 Estatísticas do Sistema")
+    st.markdown("""
+    <div class="wind-info-card slide-in">
+        <h4 class="wind-info-title">📊 Estatísticas do Sistema</h4>
+    </div>
+    """, unsafe_allow_html=True)
     
     try:
         # Inicializar repositórios
@@ -94,21 +98,13 @@ def show_statistics():
         cidades = cidade_repo.listar_todos()
         
         # Exibir métricas
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
+        col_metric1, col_metric2, col_metric3 = st.columns(3, border=True,vertical_alignment="center")
+        with col_metric1:
             st.metric("🏳️ Países", len(paises))
-        
-        with col2:
+        with col_metric2:
             st.metric("🗺️ Estados/Regiões", len(regioes))
-        
-        with col3:
+        with col_metric3:
             st.metric("🏙️ Cidades", len(cidades))
-        
-        with col4:
-            # População total (apenas cidades com dados)
-            pop_total = sum(c.populacao for c in cidades if c.populacao)
-            st.metric("👥 População Total", f"{pop_total:,}")
             
     except Exception as e:
         st.error(f"Erro ao carregar estatísticas: {e}")
@@ -116,7 +112,12 @@ def show_statistics():
 
 def show_countries():
     """Exibe a lista de países"""
-    st.markdown("### 🏳️ Países Cadastrados")
+    st.markdown("""
+    <div class="wind-info-card slide-in">
+        <h4 class="wind-info-title">🏳️ Países Cadastrados</h4>
+    </div>
+    """, unsafe_allow_html=True)
+    
     
     try:
         pais_repo = PaisRepository()
@@ -139,16 +140,6 @@ def show_countries():
         # Exibir tabela
         st.dataframe(df_paises, use_container_width=True, hide_index=True)
         
-        # Opções de ação
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.button("🔄 Atualizar Lista de Países"):
-                st.rerun()
-        
-        with col2:
-            if st.button("➕ Cadastrar Novo País"):
-                st.switch_page("pages/1_cadastro_localidade.py")
                 
     except Exception as e:
         st.error(f"Erro ao carregar países: {e}")
@@ -156,7 +147,11 @@ def show_countries():
 
 def show_states():
     """Exibe a lista de estados/regiões"""
-    st.markdown("### 🗺️ Estados/Regiões Cadastrados")
+    st.markdown("""
+    <div class="wind-info-card slide-in">
+        <h4 class="wind-info-title">🗺️ Estados/Regiões Cadastrados</h4>
+    </div>
+    """, unsafe_allow_html=True)
     
     try:
         regiao_repo = RegiaoRepository()
@@ -192,34 +187,45 @@ def show_states():
         # Exibir tabela
         st.dataframe(df_filtered, use_container_width=True, hide_index=True)
         
-        # Opções de ação
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.button("🔄 Atualizar Lista de Estados"):
-                st.rerun()
-        
-        with col2:
-            if st.button("➕ Cadastrar Novo Estado"):
-                st.switch_page("pages/1_cadastro_localidade.py")
                 
     except Exception as e:
         st.error(f"Erro ao carregar estados: {e}")
 
 
-def show_cities():
+def show_all_information():
     """Exibe a lista de cidades com mapa"""
-    st.markdown("### 🏙️ Cidades Cadastradas")
+    
+    
     
     try:
+        # Inicializar repositórios
         cidade_repo = CidadeRepository()
         regiao_repo = RegiaoRepository()
         pais_repo = PaisRepository()
         
+        # Buscar dados
         cidades = cidade_repo.listar_todos()
         regioes = {r.id: r.nome for r in regiao_repo.listar_todos()}
         paises = {p.id: p.nome for p in pais_repo.listar_todos()}
+
+        col1, col2, col3 = st.columns(3, border=True, vertical_alignment="top")
+
+        with col1:
+            show_statistics()
+            
         
+        with col2:
+            show_countries()
+        
+        with col3:
+            show_states()
+
+        st.markdown("""
+            <div class="wind-info-card slide-in">
+                <h4 class="wind-info-title">🏙️ Cidades Cadastradas</h4>
+            </div>
+            """, unsafe_allow_html=True)
+
         if not cidades:
             st.info("Nenhuma cidade cadastrada ainda.")
             return
@@ -251,7 +257,11 @@ def show_cities():
         
         # Exibir mapa se houver cidades
         if cidades_filtradas:
-            st.markdown("#### 🗺️ Mapa das Localidades")
+            st.markdown("""
+                <div class="wind-info-card slide-in">
+                    <h4 class="wind-info-title">🗺️ Mapa das Localidades</h4>
+                </div>
+                """, unsafe_allow_html=True)
             
             mapa = create_map_from_cities(cidades_filtradas)
             if mapa:
@@ -274,8 +284,12 @@ def show_cities():
                 }
                 for cidade in cidades_filtradas
             ])
+            st.markdown(f"""
+                <div class="wind-info-card slide-in">
+                    <h4 class="wind-info-title">📋 Lista de Cidades ({len(cidades_filtradas)} encontradas)</h4>
+                </div>
+                """, unsafe_allow_html=True)
             
-            st.markdown(f"#### 📋 Lista de Cidades ({len(cidades_filtradas)} encontradas)")
             st.dataframe(df_cidades, use_container_width=True, hide_index=True)
             
         else:
@@ -285,20 +299,14 @@ def show_cities():
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            if st.button("🔄 Atualizar Lista"):
+            if st.button("🔄 Atualizar Lista", use_container_width=True):
                 st.rerun()
         
         with col2:
-            if st.button("➕ Cadastrar Nova Cidade"):
-                st.switch_page("pages/1_cadastro_localidade.py")
+            if st.button("➕ Cadastrar Nova Cidade", use_container_width=True):
+                st.switch_page("src/web/pages/1_cadastro_localidade.py")
         
-        with col3:
-            if st.button("🌍 Ver Todas no Mapa"):
-                # Mostrar mapa com todas as cidades
-                if cidades:
-                    mapa_completo = create_map_from_cities(cidades)
-                    if mapa_completo:
-                        st.plotly_chart(mapa_completo, use_container_width=True)
+        
                 
     except Exception as e:
         st.error(f"Erro ao carregar cidades: {e}")
@@ -306,7 +314,12 @@ def show_cities():
 
 def show_detailed_view():
     """Exibe visualização detalhada de uma localidade específica"""
-    st.markdown("### 🔍 Visualização Detalhada")
+    
+    st.markdown("""
+    <div class="wind-info-card slide-in">
+        <h4 class="wind-info-title">🔍 Visualização Detalhada</h4>
+    </div>
+    """, unsafe_allow_html=True)
     
     try:
         cidade_repo = CidadeRepository()
@@ -333,36 +346,108 @@ def show_detailed_view():
             pais = pais_repo.buscar_por_id(cidade.pais_id) if cidade.pais_id else None
             
             # Exibir informações em colunas
-            col1, col2 = st.columns(2)
+            col1, col2, col3, col4 = st.columns(4, border=True)
             
             with col1:
-                st.markdown("#### 📍 Informações Básicas")
-                st.write(f"**Nome:** {cidade.nome}")
-                st.write(f"**ID:** {cidade.id}")
-                st.write(f"**Estado:** {regiao.nome if regiao else 'N/A'}")
-                st.write(f"**País:** {pais.nome if pais else 'N/A'}")
+                st.markdown("""
+                    <div class="wind-info-card slide-in">
+                        <h4 class="wind-info-title">📝 Informações Básicas</h4>
+                    </div>
+                    """, unsafe_allow_html=True)
                 
-                st.markdown("#### 🌍 Coordenadas")
-                st.write(f"**Latitude:** {cidade.latitude:.6f}")
-                st.write(f"**Longitude:** {cidade.longitude:.6f}")
+
+                st.markdown(f"""
+                    <div class="info-item">
+                        <span class="info-label">Nome:</span> 
+                        <span class="info-value">{cidade.nome}</span>
+                    </div>                
+                    """, unsafe_allow_html=True)
+                st.markdown(f"""
+                    <div class="info-item">
+                        <span class="info-label">ID:</span> 
+                        <span class="info-value">{cidade.id}</span>
+                    </div>                
+                    """, unsafe_allow_html=True)
+                st.markdown(f"""
+                    <div class="info-item">
+                        <span class="info-label">Estado:</span> 
+                        <span class="info-value">{regiao.nome if regiao else 'N/A'}</span>
+                    </div>                
+                    """, unsafe_allow_html=True)
+                st.markdown(f"""
+                    <div class="info-item">
+                        <span class="info-label">País:</span> 
+                        <span class="info-value">{pais.nome if pais else 'N/A'}</span>
+                    </div>                
+                    """, unsafe_allow_html=True)
+            with col2:    
+                st.markdown("""
+                    <div class="wind-info-card slide-in">
+                        <h4 class="wind-info-title">🌍 Coordenadas</h4>
+                    </div>
+                    """, unsafe_allow_html=True)
+                st.markdown(f"""
+                    <div class="info-item">
+                        <span class="info-label">Latitude:</span> 
+                        <span class="info-value">{cidade.latitude:.6f}</span>
+                    </div>                
+                    """, unsafe_allow_html=True)
+                st.markdown(f"""
+                    <div class="info-item">
+                        <span class="info-label">Longitude:</span> 
+                        <span class="info-value">{cidade.longitude:.6f}</span>
+                    </div>                
+                    """, unsafe_allow_html=True)
                 
-            with col2:
-                st.markdown("#### 📊 Dados Demográficos")
-                st.write(f"**População:** {cidade.populacao:,}" if cidade.populacao else "**População:** N/A")
-                st.write(f"**Altitude:** {cidade.altitude:.1f} metros" if cidade.altitude else "**Altitude:** N/A")
-                
+            with col3:
+                st.markdown("""
+                    <div class="wind-info-card slide-in">
+                        <h4 class="wind-info-title">📊 Dados Demográficos</h4>
+                    </div>
+                    """, unsafe_allow_html=True)
+                # Exibir população com formatação e ícone
+                demog_items = [
+                    ("👥 População", f"{cidade.populacao:,}" if cidade.populacao else "N/A"),
+                    ("⛰️ Altitude", f"{cidade.altitude:.1f} metros" if cidade.altitude else "N/A")
+                ]
+                # Generate HTML using the proper CSS classes
+                for label, value in demog_items:
+                    if value is None:
+                        continue
+                    elif isinstance(value, str) and len(value) == 0:
+                        continue
+                    st.markdown(f"""
+                    <div class="info-item">
+                        <span class="info-label">{label}:</span> 
+                        <span class="info-value">{value}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+            with col4:    
                 if cidade.notes:
-                    st.markdown("#### 📝 Observações")
+                    st.markdown("""
+                        <div class="wind-info-card slide-in">
+                            <h4 class="wind-info-title">📝 Observações</h4>
+                        </div>
+                        """, unsafe_allow_html=True)
                     st.write(cidade.notes)
             
             # Mapa individual
-            st.markdown("#### 🗺️ Localização no Mapa")
+            st.markdown("""
+                <div class="wind-info-card slide-in">
+                    <h4 class="wind-info-title">🗺️ Localização no Mapa</h4>
+                </div>
+                """, unsafe_allow_html=True)
             mapa_individual = create_map_from_cities([cidade])
             if mapa_individual:
                 st.plotly_chart(mapa_individual, use_container_width=True)
             
             # Cidades próximas
-            st.markdown("#### 🏘️ Cidades Próximas")
+            st.markdown("""
+                <div class="wind-info-card slide-in">
+                    <h4 class="wind-info-title">🏘️ Cidades Próximas</h4>
+                </div>
+                """, unsafe_allow_html=True)
             try:
                 cidades_proximas = cidade_repo.buscar_proximas(
                     cidade.latitude, 
@@ -390,8 +475,12 @@ def main():
     """Função principal da página"""
     
     # Título principal
-    st.title("📋 Listar Localidades")
-    st.markdown("Visualize e gerencie todas as localidades cadastradas no sistema")
+    st.markdown("""
+    <div class="page-main-header">
+        <h1>📋 Listar Localidades</h1>
+        <p>Visualize e gerencie todas as localidades cadastradas no sistema</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Sidebar com opções
     st.sidebar.header("🛠️ Opções de Visualização")
@@ -402,9 +491,9 @@ def main():
         [
             "🔍 Visualização Detalhada",
             "📊 Estatísticas Gerais",
-            "🏳️ Países",
-            "🗺️ Estados/Regiões", 
-            "🏙️ Cidades com Mapa"
+            # "🏳️ Países",
+            # "🗺️ Estados/Regiões", 
+            # "🏙️ Cidades com Mapa"
             
         ]
     )
@@ -412,28 +501,15 @@ def main():
     # Informações no sidebar
     st.sidebar.markdown("---")
     st.sidebar.info("""
-    **💡 Dicas:**
-    
-    • **Estatísticas:** Visão geral do sistema
-    • **Países:** Lista todos os países cadastrados
-    • **Estados:** Lista estados/regiões por país
-    • **Cidades:** Lista com mapa interativo
+    **💡 Dicas:** \n
+    • **Estatísticas:** Visão geral do sistema \n
     • **Detalhada:** Informações completas de uma cidade
     """)
     
     # Renderizar a visualização selecionada
     try:
         if modo_visualizacao == "📊 Estatísticas Gerais":
-            show_statistics()
-            
-        elif modo_visualizacao == "🏳️ Países":
-            show_countries()
-            
-        elif modo_visualizacao == "🗺️ Estados/Regiões":
-            show_states()
-            
-        elif modo_visualizacao == "🏙️ Cidades com Mapa":
-            show_cities()
+            show_all_information()
             
         elif modo_visualizacao == "🔍 Visualização Detalhada":
             show_detailed_view()
