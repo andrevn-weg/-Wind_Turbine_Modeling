@@ -1,4 +1,5 @@
 Ideia de divisão dos arquivos:
+```
 wind_turbine_project/
 |
 |__pais/               # Todo código relacionado a países
@@ -35,7 +36,7 @@ wind_turbine_project/
 |  |__migrations.py    
 |
 |__main.py            # Ponto de entrada da aplicação
-
+```
 Para obter dados climáticos de uma cidade, recomendo usar SQLite com a seguinte estrutura:
 
 ```python
