@@ -192,17 +192,13 @@ wind_turbine_project/
 - [x] **Validações de domínio** - Verificações de integridade dos dados meteorológicos
 - [x] **Exemplos de integração** - Scripts demonstrando uso completo do módulo meteorológico
 
-### 🚀 **Pronto para Implementação Imediata**
-- [ ] **Módulo climático completo** - Análise de dados meteorológicos
-- [ ] **Integração com APIs climáticas** - Open-Meteo e similares
-- [ ] **Processamento de séries temporais** - Análise de dados históricos de vento
-- [ ] **Modelos de dados climáticos** - Entidades para temperatura, umidade, vento
-
-### 🔄 **Para Desenvolvimento Futuro**
-- [ ] **Sistema de simulação de turbinas** - Modelagem matemática
+### � **Para Desenvolvimento Futuro**
+- [ ] **Interface web para dados meteorológicos** - Páginas especializadas para análise climática
+- [ ] **Cliente para APIs meteorológicas externas** - Integração com Open-Meteo, NASA POWER
+- [ ] **Sistema de simulação de turbinas** - Modelagem matemática baseada em dados reais
 - [ ] **Sistema de controle de turbinas** - Algoritmos de controle avançado
-- [ ] **Relatórios de análise de viabilidade** - Estudos econômicos
-- [ ] **Testes automatizados** - Cobertura de testes unitários
+- [ ] **Relatórios de análise de viabilidade** - Estudos econômicos automatizados
+- [ ] **Testes automatizados** - Cobertura de testes unitários e integração
 
 ### ❌ **Não Prioritárias no Momento**
 - [ ] **Exportação de dados** - Funcionalidade secundária

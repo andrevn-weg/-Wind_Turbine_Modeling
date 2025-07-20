@@ -36,12 +36,10 @@ pages = {
         st.Page(page="src/web/pages/2_listar_localidades.py", title="Listar Localidades", icon="📋"),
     ],
     "🌤️ Dados Climáticos": [
-        st.Page(page="src/web/pages/3_analise_climatica.py", title="Análise Climática", icon="🌤️"),
-        st.Page(page="src/web/pages/4_coleta_dados.py", title="Coleta de Dados", icon="🌤️"),
+        st.Page(page="src/web/pages/3_cadastro_dados_climaticos.py", title="Cadastro de Dados Climáticos", icon="🌦️"),
+        st.Page(page="src/web/pages/6_comparacao_fontes.py", title="Comparação de Fontes", icon="🔍"),
     ],
-    "⚡ Simulação": [
-        st.Page(page="src/web/pages/5_simulacao_turbinas.py", title="Simulação de Turbinas", icon="⚡"),
-    ]
+    
 }
 
 # Navegação
