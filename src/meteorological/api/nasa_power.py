@@ -293,8 +293,12 @@ class NASAPowerClient:
                 'header': data.get('header', {}),
                 'mensagens': data.get('messages', [])
             },
-            'dados_por_altura': {}
+            'dados_por_altura': {},
+            'dados': []  # Formato compatível com interface
         }
+        
+        # Processar dados por altura e criar lista de registros diários
+        registros_por_data = {}
         
         for altura in alturas:
             # Mapear altura para parâmetro NASA
@@ -338,6 +342,68 @@ class NASAPowerClient:
                 'velocidades_vento': velocidades,
                 'estatisticas': estatisticas
             }
+            
+            # Converter timestamps e velocidades em registros horários para interface
+            for i, timestamp in enumerate(timestamps_ordenados):
+                # Converter timestamp YYYYMMDDHH para datetime completo
+                try:
+                    # Extrair data e hora do timestamp NASA POWER (formato: YYYYMMDDHH)
+                    if len(timestamp) >= 10:
+                        data_hora_str = timestamp[:8] + timestamp[8:10]  # YYYYMMDDHH
+                        data_hora_registro = datetime.strptime(data_hora_str, '%Y%m%d%H')
+                    else:
+                        # Fallback para apenas data (meio-dia como padrão)
+                        data_hora_registro = datetime.strptime(timestamp[:8], '%Y%m%d').replace(hour=12)
+                    velocidade = velocidades[i]
+                    
+                    # Criar chave única por data e hora
+                    data_hora_str = data_hora_registro.strftime('%Y-%m-%d %H:%M:%S')
+                    
+                    if data_hora_str not in registros_por_data:
+                        registros_por_data[data_hora_str] = {
+                            'data_hora': data_hora_registro,
+                            'temperaturas': [],
+                            'umidades': [],
+                            'velocidades_vento': [],
+                            'alturas': []
+                        }
+                    
+                    # Adicionar dados desta altura se velocidade válida
+                    if velocidade is not None and velocidade != -999:
+                        registros_por_data[data_hora_str]['velocidades_vento'].append(velocidade)
+                        registros_por_data[data_hora_str]['alturas'].append(altura)
+                        # NASA POWER não fornece temperatura e umidade diretamente
+                        registros_por_data[data_hora_str]['temperaturas'].append(None)
+                        registros_por_data[data_hora_str]['umidades'].append(None)
+                        
+                except ValueError:
+                    continue  # Pular timestamps inválidos
+        
+        # Converter registros agrupados em formato final esperado pela interface
+        for data_hora_str, dados_registro in registros_por_data.items():
+            if dados_registro['velocidades_vento']:  # Só incluir se há dados válidos
+                # Para cada altura que tem dados neste registro
+                alturas_unicas = list(set(dados_registro['alturas']))
+                
+                for altura_unica in alturas_unicas:
+                    # Filtrar velocidades desta altura específica
+                    velocidades_altura = [
+                        dados_registro['velocidades_vento'][i] 
+                        for i, h in enumerate(dados_registro['alturas']) 
+                        if h == altura_unica
+                    ]
+                    
+                    if velocidades_altura:
+                        # Calcular média para esta altura
+                        velocidade_media = sum(velocidades_altura) / len(velocidades_altura)
+                        
+                        resultado['dados'].append({
+                            'data_hora': dados_registro['data_hora'],
+                            'temperatura': None,  # NASA POWER não fornece temperatura por padrão
+                            'umidade': None,      # NASA POWER não fornece umidade por padrão
+                            'velocidade_vento': velocidade_media,
+                            'altura_captura': altura_unica
+                        })
         
         return resultado
     

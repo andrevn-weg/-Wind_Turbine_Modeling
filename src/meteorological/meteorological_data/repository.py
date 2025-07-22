@@ -45,7 +45,7 @@ class MeteorologicalDataRepository:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 meteorological_data_source_id INTEGER NOT NULL,
                 cidade_id INTEGER NOT NULL,
-                data DATE NOT NULL,
+                data_hora TIMESTAMP NOT NULL,
                 altura_captura REAL,
                 velocidade_vento REAL,
                 temperatura REAL,
@@ -83,10 +83,10 @@ class MeteorologicalDataRepository:
             self._conectar()
             self.cursor.execute('''
             INSERT INTO meteorological_data 
-            (meteorological_data_source_id, cidade_id, data, altura_captura, 
+            (meteorological_data_source_id, cidade_id, data_hora, altura_captura, 
              velocidade_vento, temperatura, umidade, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (dados.meteorological_data_source_id, dados.cidade_id, dados.data,
+            ''', (dados.meteorological_data_source_id, dados.cidade_id, dados.data_hora,
                   dados.altura_captura, dados.velocidade_vento, dados.temperatura,
                   dados.umidade, dados.created_at))
             self.conn.commit()
@@ -130,7 +130,7 @@ class MeteorologicalDataRepository:
         """
         try:
             self._conectar()
-            query = 'SELECT * FROM meteorological_data WHERE cidade_id = ? ORDER BY data DESC'
+            query = 'SELECT * FROM meteorological_data WHERE cidade_id = ? ORDER BY data_hora DESC'
             params = [cidade_id]
             
             if limite:
@@ -157,7 +157,7 @@ class MeteorologicalDataRepository:
         """
         try:
             self._conectar()
-            query = 'SELECT * FROM meteorological_data WHERE meteorological_data_source_id = ? ORDER BY data DESC'
+            query = 'SELECT * FROM meteorological_data WHERE meteorological_data_source_id = ? ORDER BY data_hora DESC'
             params = [fonte_id]
             
             if limite:
@@ -171,14 +171,14 @@ class MeteorologicalDataRepository:
         finally:
             self._desconectar()
     
-    def buscar_por_periodo(self, data_inicio: date, data_fim: date, 
+    def buscar_por_periodo(self, data_inicio: datetime, data_fim: datetime, 
                           cidade_id: Optional[int] = None) -> List[MeteorologicalData]:
         """
         Busca dados meteorológicos por período.
         
         Args:
-            data_inicio: Data inicial do período
-            data_fim: Data final do período
+            data_inicio: Data/hora inicial do período
+            data_fim: Data/hora final do período
             cidade_id: ID da cidade (opcional)
             
         Returns:
@@ -186,14 +186,14 @@ class MeteorologicalDataRepository:
         """
         try:
             self._conectar()
-            query = 'SELECT * FROM meteorological_data WHERE data BETWEEN ? AND ?'
+            query = 'SELECT * FROM meteorological_data WHERE data_hora BETWEEN ? AND ?'
             params = [data_inicio, data_fim]
             
             if cidade_id:
                 query += ' AND cidade_id = ?'
                 params.append(cidade_id)
             
-            query += ' ORDER BY data DESC'
+            query += ' ORDER BY data_hora DESC'
             
             self.cursor.execute(query, params)
             resultados = self.cursor.fetchall()
@@ -300,7 +300,7 @@ class MeteorologicalDataRepository:
             JOIN cidades c ON md.cidade_id = c.id
             JOIN meteorological_data_source mds ON md.meteorological_data_source_id = mds.id
             WHERE c.regiao_id = ? 
-            AND md.data >= date('now', '-{} days')
+            AND md.data_hora >= datetime('now', '-{} days')
             ORDER BY md.data DESC, c.nome
             '''.format(dias)
             
@@ -334,10 +334,10 @@ class MeteorologicalDataRepository:
             self._conectar()
             self.cursor.execute('''
             UPDATE meteorological_data
-            SET meteorological_data_source_id = ?, cidade_id = ?, data = ?,
+            SET meteorological_data_source_id = ?, cidade_id = ?, data_hora = ?,
                 altura_captura = ?, velocidade_vento = ?, temperatura = ?, umidade = ?
             WHERE id = ?
-            ''', (dados.meteorological_data_source_id, dados.cidade_id, dados.data,
+            ''', (dados.meteorological_data_source_id, dados.cidade_id, dados.data_hora,
                   dados.altura_captura, dados.velocidade_vento, dados.temperatura,
                   dados.umidade, dados.id))
             self.conn.commit()
@@ -365,7 +365,7 @@ class MeteorologicalDataRepository:
         finally:
             self._desconectar()
     
-    def excluir_por_cidade_e_periodo(self, cidade_id: int, data_inicio: date, data_fim: date) -> int:
+    def excluir_por_cidade_e_periodo(self, cidade_id: int, data_inicio: datetime, data_fim: datetime) -> int:
         """
         Remove dados meteorológicos por cidade e período.
         
@@ -381,7 +381,7 @@ class MeteorologicalDataRepository:
             self._conectar()
             self.cursor.execute('''
             DELETE FROM meteorological_data 
-            WHERE cidade_id = ? AND data BETWEEN ? AND ?
+            WHERE cidade_id = ? AND data_hora BETWEEN ? AND ?
             ''', (cidade_id, data_inicio, data_fim))
             self.conn.commit()
             
@@ -401,7 +401,7 @@ class MeteorologicalDataRepository:
         """
         try:
             self._conectar()
-            query = 'SELECT * FROM meteorological_data ORDER BY data DESC'
+            query = 'SELECT * FROM meteorological_data ORDER BY data_hora DESC'
             
             if limite:
                 query += f' LIMIT {limite}'
@@ -424,12 +424,20 @@ class MeteorologicalDataRepository:
             MeteorologicalData: Instância da entidade MeteorologicalData
         """
         # Converter strings de data/timestamp se necessário
-        data_obj = None
-        if row[3]:  # campo data
+        data_hora_obj = None
+        if row[3]:  # campo data_hora
             if isinstance(row[3], str):
-                data_obj = datetime.strptime(row[3], '%Y-%m-%d').date()
+                # Tentar diferentes formatos de timestamp
+                try:
+                    data_hora_obj = datetime.fromisoformat(row[3])
+                except ValueError:
+                    try:
+                        data_hora_obj = datetime.strptime(row[3], '%Y-%m-%d %H:%M:%S')
+                    except ValueError:
+                        # Fallback para formato de data apenas
+                        data_hora_obj = datetime.strptime(row[3], '%Y-%m-%d')
             else:
-                data_obj = row[3]
+                data_hora_obj = row[3]
         
         created_at_obj = None
         if row[8]:  # campo created_at
@@ -442,7 +450,7 @@ class MeteorologicalDataRepository:
             id=row[0],
             meteorological_data_source_id=row[1],
             cidade_id=row[2],
-            data=data_obj,
+            data_hora=data_hora_obj,
             altura_captura=row[4],
             velocidade_vento=row[5],
             temperatura=row[6],

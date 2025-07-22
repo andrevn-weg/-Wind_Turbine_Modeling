@@ -8,7 +8,7 @@ class MeteorologicalDataSource:
     Entidade de domínio para representar uma fonte de dados meteorológicos.
     
     Esta classe representa apenas o objeto de negócio, sem responsabilidades de persistência.
-    Exemplos de fontes: NASA_POWER, OpenWeatherMap, INMET, etc.
+    Exemplos de fontes: NASA_POWER e etc.
     
     Attributes:
         id (Optional[int]): Identificador único da fonte no banco de dados

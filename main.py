@@ -36,8 +36,9 @@ pages = {
         st.Page(page="src/web/pages/2_listar_localidades.py", title="Listar Localidades", icon="📋"),
     ],
     "🌤️ Dados Climáticos": [
-        st.Page(page="src/web/pages/3_cadastro_dados_climaticos.py", title="Cadastro de Dados Climáticos", icon="🌦️"),
-        st.Page(page="src/web/pages/6_comparacao_fontes.py", title="Comparação de Fontes", icon="🔍"),
+        st.Page(page="src/web/pages/3_meteorological_registration.py", title="Cadastro de Dados Climáticos", icon="🌦️"),
+        st.Page(page="src/web/pages/4_meteorological_analysis.py", title="Análises Meteorológicas", icon="📊"),
+        # st.Page(page="src/web/pages/6_comparacao_fontes.py", title="Comparação de Fontes", icon="🔍"),
     ],
     
 }

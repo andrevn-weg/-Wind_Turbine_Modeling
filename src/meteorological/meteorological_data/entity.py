@@ -15,7 +15,7 @@ class MeteorologicalData:
         id (Optional[int]): Identificador único do registro no banco de dados
         meteorological_data_source_id (int): Referência à fonte dos dados (chave estrangeira)
         cidade_id (int): Referência à cidade onde foi coletado o dado (chave estrangeira)
-        data (date): Data da medição meteorológica
+        data_hora (datetime): Data e hora da medição meteorológica (timestamp completo)
         altura_captura (Optional[float]): Altura em metros onde foi realizada a captura do vento
         velocidade_vento (Optional[float]): Velocidade do vento em m/s
         temperatura (Optional[float]): Temperatura em graus Celsius
@@ -25,7 +25,7 @@ class MeteorologicalData:
     id: Optional[int] = None
     meteorological_data_source_id: int = 0
     cidade_id: int = 0
-    data: Optional[date] = None
+    data_hora: Optional[datetime] = None
     altura_captura: Optional[float] = None
     velocidade_vento: Optional[float] = None
     temperatura: Optional[float] = None
@@ -45,8 +45,8 @@ class MeteorologicalData:
         if not self.cidade_id or self.cidade_id <= 0:
             return False
         
-        # Data é obrigatória
-        if not self.data:
+        # Data/hora é obrigatória
+        if not self.data_hora:
             return False
         
         # Validações de dados meteorológicos opcionais, mas se fornecidos devem ser válidos
@@ -138,7 +138,7 @@ class MeteorologicalData:
             'id': self.id,
             'meteorological_data_source_id': self.meteorological_data_source_id,
             'cidade_id': self.cidade_id,
-            'data': self.data.isoformat() if self.data else None,
+            'data_hora': self.data_hora.isoformat() if self.data_hora else None,
             'altura_captura': self.altura_captura,
             'velocidade_vento': self.velocidade_vento,
             'temperatura': self.temperatura,
@@ -163,7 +163,7 @@ class MeteorologicalData:
             componentes.append(f"Umidade: {self.umidade}%")
         
         dados_str = " | ".join(componentes) if componentes else "Sem dados"
-        return f"[{self.data}] {dados_str}"
+        return f"[{self.data_hora}] {dados_str}"
     
     def __repr__(self) -> str:
         """
@@ -173,4 +173,4 @@ class MeteorologicalData:
             str: String técnica dos dados
         """
         return (f"MeteorologicalData(id={self.id}, fonte_id={self.meteorological_data_source_id}, "
-                f"cidade_id={self.cidade_id}, data={self.data}, vento={self.velocidade_vento})")
+                f"cidade_id={self.cidade_id}, data_hora={self.data_hora}, vento={self.velocidade_vento})")

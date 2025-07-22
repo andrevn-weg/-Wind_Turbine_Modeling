@@ -248,8 +248,12 @@ class OpenMeteoClient:
                 'total_registros': len(timestamps),
                 'fonte': 'Open-Meteo'
             },
-            'dados_por_altura': {}
+            'dados_por_altura': {},
+            'dados': []  # Formato compatível com interface
         }
+        
+        # Processar dados por altura e criar lista de registros diários
+        registros_por_data = {}
         
         for altura in alturas:
             parametro = f"wind_speed_{altura}m"
@@ -281,6 +285,63 @@ class OpenMeteoClient:
                 'velocidades_vento': velocidades,
                 'estatisticas': estatisticas
             }
+            
+            # Converter timestamps e velocidades em registros horários para interface
+            for i, timestamp in enumerate(timestamps):
+                if i < len(velocidades):
+                    try:
+                        # Converter timestamp ISO para datetime completo
+                        data_hora_registro = datetime.fromisoformat(timestamp.replace('T', ' '))
+                        velocidade = velocidades[i]
+                        
+                        # Criar chave única por data e hora
+                        data_hora_str = data_hora_registro.strftime('%Y-%m-%d %H:%M:%S')
+                        
+                        if data_hora_str not in registros_por_data:
+                            registros_por_data[data_hora_str] = {
+                                'data_hora': data_hora_registro,
+                                'temperaturas': [],
+                                'umidades': [],
+                                'velocidades_vento': [],
+                                'alturas': []
+                            }
+                        
+                        # Adicionar dados desta altura se velocidade válida
+                        if velocidade is not None:
+                            registros_por_data[data_hora_str]['velocidades_vento'].append(velocidade)
+                            registros_por_data[data_hora_str]['alturas'].append(altura)
+                            # Open-Meteo pode fornecer temperatura e umidade se solicitados
+                            registros_por_data[data_hora_str]['temperaturas'].append(None)
+                            registros_por_data[data_hora_str]['umidades'].append(None)
+                            
+                    except (ValueError, IndexError):
+                        continue  # Pular timestamps inválidos
+        
+        # Converter registros agrupados em formato final esperado pela interface
+        for data_hora_str, dados_registro in registros_por_data.items():
+            if dados_registro['velocidades_vento']:  # Só incluir se há dados válidos
+                # Para cada altura que tem dados neste registro
+                alturas_unicas = list(set(dados_registro['alturas']))
+                
+                for altura_unica in alturas_unicas:
+                    # Filtrar velocidades desta altura específica
+                    velocidades_altura = [
+                        dados_registro['velocidades_vento'][i] 
+                        for i, h in enumerate(dados_registro['alturas']) 
+                        if h == altura_unica
+                    ]
+                    
+                    if velocidades_altura:
+                        # Calcular média para esta altura
+                        velocidade_media = sum(velocidades_altura) / len(velocidades_altura)
+                        
+                        resultado['dados'].append({
+                            'data_hora': dados_registro['data_hora'],
+                            'temperatura': None,  # Open-Meteo pode fornecer se solicitado
+                            'umidade': None,      # Open-Meteo pode fornecer se solicitado
+                            'velocidade_vento': velocidade_media,
+                            'altura_captura': altura_unica
+                        })
         
         return resultado
     
