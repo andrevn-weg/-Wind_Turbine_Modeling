@@ -304,7 +304,8 @@ def show_all_information():
         
         with col2:
             if st.button("➕ Cadastrar Nova Cidade", use_container_width=True):
-                st.switch_page("src/web/pages/1_cadastro_localidade.py")
+                st.switch_page(page="src/web/pages/1_cadastro_localidade.py")
+                st.rerun()
         
         
                 
@@ -528,7 +529,7 @@ def main():
     # Links rápidos
     st.sidebar.markdown("### 🔗 Links Rápidos")
     if st.sidebar.button("➕ Cadastrar Nova Localidade"):
-        st.switch_page("pages/1_cadastro_localidade.py")
+        st.switch_page("src/web/pages/1_cadastro_localidade.py")
 
 
 if __name__ == "__main__":

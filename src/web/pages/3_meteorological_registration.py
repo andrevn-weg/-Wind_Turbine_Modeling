@@ -18,7 +18,12 @@ sys.path.insert(0, str(src_path))
 
 # Importar as subpáginas de cadastro meteorológico
 try:
-    from web.pages.meteorological_registration import create_meteorological_data_source, create_meteorological_data
+    from web.pages.meteorological_registration import (
+        create_meteorological_data_source, 
+        create_meteorological_data,
+        view_meteorological_data,
+        delete_meteorological_data
+    )
 except ImportError as e:
     st.error(f"Erro ao importar subpáginas de cadastro meteorológico: {e}")
 
@@ -42,12 +47,15 @@ st.markdown("""
 # Sidebar com informações
 st.sidebar.header("ℹ️ Informações")
 st.sidebar.info("""
-**Ordem recomendada de cadastro:**
-1. 🗃️ **Fonte de Dados** - Cadastre primeiro as origens dos dados
-2. 🌪️ **Dados Meteorológicos** - Depois colete os dados das APIs
+**Funcionalidades disponíveis:**
+1. 🌪️ **Cadastrar Dados** - Colete dados das APIs
+2. 🆕 **Cadastrar Fonte** - Registre origens dos dados  
+3. 📊 **Visualizar Dados** - Consulte dados coletados
+4. 🗑️ **Excluir Dados** - Remova dados específicos
+
 **Fontes Disponíveis:**
 • **NASA POWER** - Alturas: 10m, 50m
-• **Open-Meteo** - Alturas: 10m, 80m, 120m, 180m
+• **Open-Meteo** - Alturas: 10m
 """)
 # Avisos importantes
 st.sidebar.warning("""
@@ -59,19 +67,35 @@ O sistema automaticamente verifica e impede o cadastro de dados duplicados com b
 - Fonte de dados  
 - Altura de captura
 """)
+
+st.sidebar.success("""
+💡 **Dicas de Uso**
+
+• **Visualização:** Use filtros para explorar os dados
+• **Exclusão:** Sempre confira os dados antes de excluir
+• **Backup:** Considere exportar antes de excluir
+""")
 # Inicializar estado da sessão se não existir
 if 'selected_meteorological_tab' not in st.session_state:
-    st.session_state.selected_meteorological_tab = 'fonte'
+    st.session_state.selected_meteorological_tab = 'dados'
 # Interface principal com abas
-col1, col2 = st.columns(2)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    if st.button("🗃️ Cadastrar Fonte de Dados", use_container_width=True):
-        st.session_state.selected_meteorological_tab = 'fonte'
+    if st.button("🌪️ Cadastrar Dados", use_container_width=True):
+        st.session_state.selected_meteorological_tab = 'dados'
 
 with col2:
-    if st.button("🌪️ Cadastrar Dados Meteorológicos", use_container_width=True):
-        st.session_state.selected_meteorological_tab = 'dados'
+    if st.button("🆕 Cadastrar Fonte", use_container_width=True):
+        st.session_state.selected_meteorological_tab = 'fonte'
+
+with col3:
+    if st.button("📊 Visualizar Dados", use_container_width=True):
+        st.session_state.selected_meteorological_tab = 'visualizar'
+
+with col4:
+    if st.button("🗑️ Excluir Dados", use_container_width=True):
+        st.session_state.selected_meteorological_tab = 'excluir'
 st.markdown("---")
 # Renderizar a aba selecionada
 try:
@@ -81,6 +105,12 @@ try:
     elif st.session_state.selected_meteorological_tab == 'dados':
         create_meteorological_data()
         
+    elif st.session_state.selected_meteorological_tab == 'visualizar':
+        view_meteorological_data()
+        
+    elif st.session_state.selected_meteorological_tab == 'excluir':
+        delete_meteorological_data()
+        
 except Exception as e:
     st.error(f"❌ Erro ao carregar interface: {str(e)}")
     
@@ -89,7 +119,8 @@ except Exception as e:
         st.code(traceback.format_exc())
 # Rodapé com links úteis
 st.sidebar.markdown("---")
-st.sidebar.success("✅ Sistema de cadastro meteorológico ativo!")
+st.sidebar.success("✅ Sistema meteorológico completo ativo!")
+st.sidebar.markdown("🌤️ **Cadastro** • 📊 **Visualização** • 🗑️ **Exclusão**")
 
 
 

@@ -19,6 +19,15 @@ Pillow>=10.0.0
 requests>=2.31.0
 urllib3>=2.0.0
 
+# Para APIs meteorológicas
+httpx>=0.24.0
+
+# Open-Meteo API otimizada (dependências opcionais para melhor performance)
+# Instale estas dependências para obter cache e retry automático:
+# openmeteo-requests>=1.0.0     # Cliente oficial otimizado  
+# requests-cache>=1.0.0         # Cache automático de requisições
+# retry-requests>=2.0.0         # Retry automático em falhas
+
 # Banco de dados
 sqlite3  # Incluído no Python padrão
 
@@ -30,11 +39,6 @@ scipy>=1.11.0
 
 # Processamento de coordenadas geográficas
 geopy>=2.3.0
-
-# Para APIs meteorológicas
-httpx>=0.24.0
-
-# Desenvolvimento e testes
 pytest>=7.4.0
 black>=23.7.0
 flake8>=6.0.0

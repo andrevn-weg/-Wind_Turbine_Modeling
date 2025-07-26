@@ -389,6 +389,22 @@ class MeteorologicalDataRepository:
         finally:
             self._desconectar()
     
+    def buscar_cidades_com_dados(self) -> List[int]:
+        """
+        Busca todas as cidades que possuem dados meteorológicos.
+        
+        Returns:
+            List[int]: Lista de IDs das cidades que têm dados meteorológicos
+        """
+        try:
+            self._conectar()
+            self.cursor.execute('SELECT DISTINCT cidade_id FROM meteorological_data ORDER BY cidade_id')
+            resultados = self.cursor.fetchall()
+            
+            return [resultado[0] for resultado in resultados]
+        finally:
+            self._desconectar()
+    
     def listar_todos(self, limite: Optional[int] = None) -> List[MeteorologicalData]:
         """
         Lista todos os dados meteorológicos cadastrados.

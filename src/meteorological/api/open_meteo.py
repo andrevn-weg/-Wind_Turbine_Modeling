@@ -1,8 +1,8 @@
 """
-Cliente Open-Meteo API
+Cliente Open-Meteo API Otimizado
 
-Este módulo implementa um cliente para a API Open-Meteo, que fornece dados meteorológicos
-históricos e de previsão de forma gratuita e de código aberto.
+Este módulo implementa um cliente otimizado para a API Open-Meteo baseado no exemplo oficial,
+com melhor performance, cache e retry automático.
 
 LIMITAÇÕES DE ALTURA SUPORTADAS:
 - 10m: Velocidade do vento a 10 metros de altura
@@ -10,37 +10,84 @@ LIMITAÇÕES DE ALTURA SUPORTADAS:
 - 120m: Velocidade do vento a 120 metros de altura
 - 180m: Velocidade do vento a 180 metros de altura
 
-APENAS estas alturas são suportadas pela API Open-Meteo.
-Qualquer outra altura resultará em erro.
-
 API Documentation: https://open-meteo.com/en/docs/historical-weather-api
 """
 
 import requests
+import pandas as pd
 from datetime import datetime, date, timedelta
 from typing import Dict, List, Optional, Union
 import json
+import os
+
+# Imports opcionais para funcionalidades avançadas
+try:
+    import openmeteo_requests
+    import requests_cache
+    from retry_requests import retry
+    CLIENTE_OTIMIZADO_DISPONIVEL = True
+except ImportError:
+    CLIENTE_OTIMIZADO_DISPONIVEL = False
 
 
 class OpenMeteoClient:
     """
-    Cliente para a API Open-Meteo para obtenção de dados meteorológicos históricos.
+    Cliente otimizado para a API Open-Meteo.
     
-    A API Open-Meteo fornece dados meteorológicos históricos gratuitos,
-    incluindo velocidade do vento em diferentes alturas.
+    Usa o client oficial quando disponível, senão fallback para requests básico.
     """
     
-    BASE_URL = "https://archive-api.open-meteo.com/v1/archive"
+    # URLs corretas baseadas no exemplo oficial
+    BASE_URL_HISTORICAL = "https://historical-forecast-api.open-meteo.com/v1/forecast"
+    BASE_URL_ARCHIVE = "https://archive-api.open-meteo.com/v1/archive"
+    
     ALTURAS_SUPORTADAS = [10, 80, 120, 180]  # metros
     
-    def __init__(self, timeout: int = 30):
+    def __init__(self, timeout: int = 30, use_cache: bool = True):
         """
         Inicializa o cliente Open-Meteo.
         
         Args:
             timeout: Timeout para requisições HTTP em segundos (padrão: 30)
+            use_cache: Se deve usar cache (apenas com cliente otimizado)
         """
         self.timeout = timeout
+        self.use_cache = use_cache
+        
+        if CLIENTE_OTIMIZADO_DISPONIVEL and use_cache:
+            # Configurar cliente otimizado com cache e retry
+            self._setup_optimized_client()
+            self.client_type = "optimized"
+        else:
+            # Fallback para requests básico
+            self._setup_basic_client()
+            self.client_type = "basic"
+    
+    def _setup_optimized_client(self):
+        """Configura o cliente otimizado com cache e retry."""
+        try:
+            # Criar diretório de cache se não existir
+            cache_dir = os.path.join(os.getcwd(), '.cache')
+            os.makedirs(cache_dir, exist_ok=True)
+            
+            # Setup com cache e retry
+            cache_session = requests_cache.CachedSession(
+                os.path.join(cache_dir, 'openmeteo_cache'), 
+                expire_after=3600  # 1 hora
+            )
+            retry_session = retry(
+                cache_session, 
+                retries=5, 
+                backoff_factor=0.2
+            )
+            self.openmeteo_client = openmeteo_requests.Client(session=retry_session)
+        except Exception:
+            # Se falhar, usar cliente básico
+            self._setup_basic_client()
+            self.client_type = "basic"
+    
+    def _setup_basic_client(self):
+        """Configura o cliente básico usando requests."""
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Wind-Turbine-Modeling/1.0'
@@ -86,30 +133,9 @@ class OpenMeteoClient:
             
         Returns:
             Dict: Dados meteorológicos organizados por altura
-            
-        Raises:
-            ValueError: Se parâmetros inválidos
-            requests.RequestException: Se erro na requisição HTTP
         """
         # Validar parâmetros
-        if not (-90 <= latitude <= 90):
-            raise ValueError(f"Latitude {latitude} deve estar entre -90 e 90")
-        
-        if not (-180 <= longitude <= 180):
-            raise ValueError(f"Longitude {longitude} deve estar entre -180 e 180")
-        
-        # Converter datas para string se necessário
-        if isinstance(data_inicio, date):
-            data_inicio = data_inicio.strftime('%Y-%m-%d')
-        if isinstance(data_fim, date):
-            data_fim = data_fim.strftime('%Y-%m-%d')
-        
-        # Validar formato de data
-        try:
-            datetime.strptime(data_inicio, '%Y-%m-%d')
-            datetime.strptime(data_fim, '%Y-%m-%d')
-        except ValueError as e:
-            raise ValueError(f"Formato de data inválido. Use YYYY-MM-DD: {e}")
+        self._validar_parametros(latitude, longitude, data_inicio, data_fim)
         
         # Usar todas as alturas suportadas se não especificado
         if alturas is None:
@@ -119,20 +145,97 @@ class OpenMeteoClient:
         for altura in alturas:
             self.validar_altura(altura)
         
+        # Usar cliente otimizado ou básico
+        if self.client_type == "optimized":
+            return self._obter_dados_otimizado(latitude, longitude, data_inicio, data_fim, alturas)
+        else:
+            return self._obter_dados_basico(latitude, longitude, data_inicio, data_fim, alturas)
+    
+    def _obter_dados_otimizado(self, latitude: float, longitude: float, 
+                              data_inicio: Union[str, date], data_fim: Union[str, date], 
+                              alturas: List[int]) -> Dict:
+        """Obtém dados usando o cliente otimizado (baseado no exemplo oficial)."""
+        
+        # Converter datas para string se necessário
+        if isinstance(data_inicio, date):
+            data_inicio = data_inicio.strftime('%Y-%m-%d')
+        if isinstance(data_fim, date):
+            data_fim = data_fim.strftime('%Y-%m-%d')
+        
+        # Construir parâmetros como no exemplo oficial
+        params = {
+            "latitude": latitude,
+            "longitude": longitude,
+            "start_date": data_inicio,
+            "end_date": data_fim,
+            "hourly": [f"wind_speed_{altura}m" for altura in alturas],
+            "timezone": "auto",
+            "wind_speed_unit": "ms"
+        }
+        
+        try:
+            # Fazer requisição usando cliente otimizado
+            responses = self.openmeteo_client.weather_api(self.BASE_URL_HISTORICAL, params=params)
+            
+            if not responses:
+                raise ValueError("Nenhuma resposta da API")
+            
+            # Processar primeira (e única) localização
+            response = responses[0]
+            
+            # Extrair dados horários como no exemplo oficial
+            hourly = response.Hourly()
+            
+            # Criar range de datas usando pandas (muito mais eficiente)
+            hourly_data = {
+                "date": pd.date_range(
+                    start=pd.to_datetime(hourly.Time(), unit="s", utc=True),
+                    end=pd.to_datetime(hourly.TimeEnd(), unit="s", utc=True),
+                    freq=pd.Timedelta(seconds=hourly.Interval()),
+                    inclusive="left"
+                )
+            }
+            
+            # Extrair dados de velocidade do vento para cada altura
+            for i, altura in enumerate(alturas):
+                wind_data = hourly.Variables(i).ValuesAsNumpy()
+                hourly_data[f"wind_speed_{altura}m"] = wind_data
+            
+            # Criar DataFrame
+            df = pd.DataFrame(data=hourly_data)
+            
+            # Converter para formato esperado pelo sistema
+            return self._converter_dataframe_para_formato_sistema(df, alturas, response)
+            
+        except Exception as e:
+            raise Exception(f"Erro no cliente otimizado Open-Meteo: {e}")
+    
+    def _obter_dados_basico(self, latitude: float, longitude: float, 
+                           data_inicio: Union[str, date], data_fim: Union[str, date], 
+                           alturas: List[int]) -> Dict:
+        """Obtém dados usando requests básico (código atual melhorado)."""
+        
+        # Converter datas para string se necessário
+        if isinstance(data_inicio, date):
+            data_inicio = data_inicio.strftime('%Y-%m-%d')
+        if isinstance(data_fim, date):
+            data_fim = data_fim.strftime('%Y-%m-%d')
+        
         # Construir parâmetros da requisição
         params = {
             'latitude': latitude,
             'longitude': longitude,
             'start_date': data_inicio,
             'end_date': data_fim,
-            'hourly': self._construir_parametros_vento(alturas),
-            'timezone': 'auto'
+            'hourly': ','.join([f"wind_speed_{altura}m" for altura in alturas]),
+            'timezone': 'auto',
+            'wind_speed_unit': 'ms'
         }
         
         try:
             # Fazer requisição
             response = self.session.get(
-                self.BASE_URL,
+                self.BASE_URL_ARCHIVE,
                 params=params,
                 timeout=self.timeout
             )
@@ -140,96 +243,79 @@ class OpenMeteoClient:
             
             # Processar resposta
             data = response.json()
-            return self._processar_resposta(data, alturas)
+            return self._processar_resposta_basica(data, alturas)
             
         except requests.RequestException as e:
             raise requests.RequestException(f"Erro na requisição Open-Meteo: {e}")
     
-    def obter_dados_ano_completo(
-        self,
-        latitude: float,
-        longitude: float,
-        ano: int,
-        alturas: Optional[List[int]] = None
-    ) -> Dict:
-        """
-        Obtém dados históricos de vento para um ano completo.
+    def _converter_dataframe_para_formato_sistema(self, df: pd.DataFrame, alturas: List[int], response) -> Dict:
+        """Converte o DataFrame otimizado para o formato esperado pelo sistema."""
         
-        Args:
-            latitude: Latitude da localização
-            longitude: Longitude da localização
-            ano: Ano desejado (ex: 2024)
-            alturas: Lista de alturas em metros
-            
-        Returns:
-            Dict: Dados meteorológicos do ano completo
-        """
-        data_inicio = date(ano, 1, 1)
-        data_fim = date(ano, 12, 31)
+        resultado = {
+            'metadata': {
+                'latitude': response.Latitude(),
+                'longitude': response.Longitude(),
+                'timezone': f"{response.Timezone()}{response.TimezoneAbbreviation()}",
+                'utc_offset_seconds': response.UtcOffsetSeconds(),
+                'elevation': response.Elevation(),
+                'periodo_inicio': df['date'].iloc[0].strftime('%Y-%m-%d %H:%M:%S') if len(df) > 0 else None,
+                'periodo_fim': df['date'].iloc[-1].strftime('%Y-%m-%d %H:%M:%S') if len(df) > 0 else None,
+                'total_registros': len(df),
+                'fonte': 'Open-Meteo'
+            },
+            'dados_por_altura': {},
+            'dados': []
+        }
         
-        return self.obter_dados_historicos_vento(
-            latitude=latitude,
-            longitude=longitude,
-            data_inicio=data_inicio,
-            data_fim=data_fim,
-            alturas=alturas
-        )
-    
-    def obter_dados_ultimo_ano(
-        self,
-        latitude: float,
-        longitude: float,
-        alturas: Optional[List[int]] = None
-    ) -> Dict:
-        """
-        Obtém dados históricos de vento do último ano (365 dias retroativos).
-        
-        Args:
-            latitude: Latitude da localização
-            longitude: Longitude da localização
-            alturas: Lista de alturas em metros
-            
-        Returns:
-            Dict: Dados meteorológicos do último ano
-        """
-        data_fim = date.today() - timedelta(days=1)  # Ontem
-        data_inicio = data_fim - timedelta(days=364)  # 365 dias atrás
-        
-        return self.obter_dados_historicos_vento(
-            latitude=latitude,
-            longitude=longitude,
-            data_inicio=data_inicio,
-            data_fim=data_fim,
-            alturas=alturas
-        )
-    
-    def _construir_parametros_vento(self, alturas: List[int]) -> str:
-        """
-        Constrói a string de parâmetros para velocidade do vento nas alturas especificadas.
-        
-        Args:
-            alturas: Lista de alturas em metros
-            
-        Returns:
-            str: Parâmetros separados por vírgula para a API
-        """
-        parametros = []
+        # Processar dados por altura
         for altura in alturas:
-            parametros.append(f"wind_speed_{altura}m")
+            col_name = f"wind_speed_{altura}m"
+            if col_name in df.columns:
+                velocidades = df[col_name].tolist()
+                timestamps = df['date'].dt.strftime('%Y-%m-%d %H:%M:%S').tolist()
+                
+                # Calcular estatísticas
+                velocidades_validas = df[col_name].dropna()
+                
+                if len(velocidades_validas) > 0:
+                    estatisticas = {
+                        'velocidade_media': float(velocidades_validas.mean()),
+                        'velocidade_maxima': float(velocidades_validas.max()),
+                        'velocidade_minima': float(velocidades_validas.min()),
+                        'total_registros': len(velocidades_validas),
+                        'registros_nulos': len(df) - len(velocidades_validas)
+                    }
+                else:
+                    estatisticas = {
+                        'velocidade_media': 0,
+                        'velocidade_maxima': 0,
+                        'velocidade_minima': 0,
+                        'total_registros': 0,
+                        'registros_nulos': len(df)
+                    }
+                
+                resultado['dados_por_altura'][f"{altura}m"] = {
+                    'altura_metros': altura,
+                    'timestamps': timestamps,
+                    'velocidades_vento': velocidades,
+                    'estatisticas': estatisticas
+                }
+                
+                # Adicionar registros individuais para interface
+                for i, row in df.iterrows():
+                    if pd.notna(row[col_name]):
+                        resultado['dados'].append({
+                            'data_hora': row['date'].to_pydatetime(),
+                            'temperatura': None,
+                            'umidade': None,
+                            'velocidade_vento': float(row[col_name]),
+                            'altura_captura': altura
+                        })
         
-        return ','.join(parametros)
+        return resultado
     
-    def _processar_resposta(self, data: Dict, alturas: List[int]) -> Dict:
-        """
-        Processa a resposta da API organizando os dados por altura.
-        
-        Args:
-            data: Dados brutos da API
-            alturas: Lista de alturas solicitadas
-            
-        Returns:
-            Dict: Dados organizados por altura e processados
-        """
+    def _processar_resposta_basica(self, data: Dict, alturas: List[int]) -> Dict:
+        """Processa resposta do cliente básico (código atual mantido para compatibilidade)."""
         if 'hourly' not in data:
             raise ValueError("Resposta da API não contém dados horários")
         
@@ -249,12 +335,10 @@ class OpenMeteoClient:
                 'fonte': 'Open-Meteo'
             },
             'dados_por_altura': {},
-            'dados': []  # Formato compatível com interface
+            'dados': []
         }
         
-        # Processar dados por altura e criar lista de registros diários
-        registros_por_data = {}
-        
+        # Processar dados por altura
         for altura in alturas:
             parametro = f"wind_speed_{altura}m"
             velocidades = hourly_data.get(parametro, [])
@@ -286,64 +370,43 @@ class OpenMeteoClient:
                 'estatisticas': estatisticas
             }
             
-            # Converter timestamps e velocidades em registros horários para interface
+            # Adicionar registros individuais
             for i, timestamp in enumerate(timestamps):
-                if i < len(velocidades):
+                if i < len(velocidades) and velocidades[i] is not None:
                     try:
-                        # Converter timestamp ISO para datetime completo
                         data_hora_registro = datetime.fromisoformat(timestamp.replace('T', ' '))
-                        velocidade = velocidades[i]
-                        
-                        # Criar chave única por data e hora
-                        data_hora_str = data_hora_registro.strftime('%Y-%m-%d %H:%M:%S')
-                        
-                        if data_hora_str not in registros_por_data:
-                            registros_por_data[data_hora_str] = {
-                                'data_hora': data_hora_registro,
-                                'temperaturas': [],
-                                'umidades': [],
-                                'velocidades_vento': [],
-                                'alturas': []
-                            }
-                        
-                        # Adicionar dados desta altura se velocidade válida
-                        if velocidade is not None:
-                            registros_por_data[data_hora_str]['velocidades_vento'].append(velocidade)
-                            registros_por_data[data_hora_str]['alturas'].append(altura)
-                            # Open-Meteo pode fornecer temperatura e umidade se solicitados
-                            registros_por_data[data_hora_str]['temperaturas'].append(None)
-                            registros_por_data[data_hora_str]['umidades'].append(None)
-                            
-                    except (ValueError, IndexError):
-                        continue  # Pular timestamps inválidos
-        
-        # Converter registros agrupados em formato final esperado pela interface
-        for data_hora_str, dados_registro in registros_por_data.items():
-            if dados_registro['velocidades_vento']:  # Só incluir se há dados válidos
-                # Para cada altura que tem dados neste registro
-                alturas_unicas = list(set(dados_registro['alturas']))
-                
-                for altura_unica in alturas_unicas:
-                    # Filtrar velocidades desta altura específica
-                    velocidades_altura = [
-                        dados_registro['velocidades_vento'][i] 
-                        for i, h in enumerate(dados_registro['alturas']) 
-                        if h == altura_unica
-                    ]
-                    
-                    if velocidades_altura:
-                        # Calcular média para esta altura
-                        velocidade_media = sum(velocidades_altura) / len(velocidades_altura)
-                        
                         resultado['dados'].append({
-                            'data_hora': dados_registro['data_hora'],
-                            'temperatura': None,  # Open-Meteo pode fornecer se solicitado
-                            'umidade': None,      # Open-Meteo pode fornecer se solicitado
-                            'velocidade_vento': velocidade_media,
-                            'altura_captura': altura_unica
+                            'data_hora': data_hora_registro,
+                            'temperatura': None,
+                            'umidade': None,
+                            'velocidade_vento': velocidades[i],
+                            'altura_captura': altura
                         })
+                    except (ValueError, IndexError):
+                        continue
         
         return resultado
+    
+    def _validar_parametros(self, latitude: float, longitude: float, 
+                           data_inicio: Union[str, date], data_fim: Union[str, date]):
+        """Valida os parâmetros de entrada."""
+        if not (-90 <= latitude <= 90):
+            raise ValueError(f"Latitude {latitude} deve estar entre -90 e 90")
+        
+        if not (-180 <= longitude <= 180):
+            raise ValueError(f"Longitude {longitude} deve estar entre -180 e 180")
+        
+        # Converter e validar datas
+        if isinstance(data_inicio, date):
+            data_inicio = data_inicio.strftime('%Y-%m-%d')
+        if isinstance(data_fim, date):
+            data_fim = data_fim.strftime('%Y-%m-%d')
+        
+        try:
+            datetime.strptime(data_inicio, '%Y-%m-%d')
+            datetime.strptime(data_fim, '%Y-%m-%d')
+        except ValueError as e:
+            raise ValueError(f"Formato de data inválido. Use YYYY-MM-DD: {e}")
     
     def obter_informacoes_api(self) -> Dict:
         """
@@ -354,20 +417,24 @@ class OpenMeteoClient:
         """
         return {
             'nome': 'Open-Meteo Historical Weather API',
-            'url_base': self.BASE_URL,
+            'client_type': self.client_type,
+            'url_historical': self.BASE_URL_HISTORICAL,
+            'url_archive': self.BASE_URL_ARCHIVE,
             'alturas_suportadas': self.ALTURAS_SUPORTADAS,
             'unidade_velocidade': 'm/s',
             'frequencia_dados': 'Horária',
             'periodo_historico': 'A partir de 1940',
             'gratuita': True,
+            'cache_ativo': self.use_cache and self.client_type == "optimized",
+            'cliente_otimizado_disponivel': CLIENTE_OTIMIZADO_DISPONIVEL,
             'limite_requisicoes': 'Sem limite oficial, mas recomenda-se uso responsável',
             'documentacao': 'https://open-meteo.com/en/docs/historical-weather-api'
         }
     
     def __str__(self) -> str:
         """Representação em string do cliente."""
-        return f"OpenMeteoClient(alturas_suportadas={self.ALTURAS_SUPORTADAS})"
+        return f"OpenMeteoClient(type={self.client_type}, alturas_suportadas={self.ALTURAS_SUPORTADAS})"
     
     def __repr__(self) -> str:
         """Representação técnica do cliente."""
-        return f"OpenMeteoClient(timeout={self.timeout}, base_url='{self.BASE_URL}')"
+        return f"OpenMeteoClient(timeout={self.timeout}, client_type='{self.client_type}')"

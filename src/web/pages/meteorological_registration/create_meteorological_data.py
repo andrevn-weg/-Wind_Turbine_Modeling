@@ -3,7 +3,7 @@ Subpágina para cadastro de dados meteorológicos
 
 Esta página permite coletar e cadastrar dados meteorológicos das APIs:
 - NASA POWER (alturas: 10m, 50m)
-- Open-Meteo (alturas: 10m, 80m, 120m, 180m)
+- Open-Meteo (alturas: 10m)
 
 Inclui validação para evitar dados duplicados.
 """
@@ -34,6 +34,12 @@ def verificar_dados_existentes(repo, cidade_id, fonte_id, data_inicio, data_fim,
         bool: True se existem dados duplicados
     """
     try:
+        # Converter objetos date para datetime se necessário
+        if isinstance(data_inicio, date) and not isinstance(data_inicio, datetime):
+            data_inicio = datetime.combine(data_inicio, datetime.min.time())
+        if isinstance(data_fim, date) and not isinstance(data_fim, datetime):
+            data_fim = datetime.combine(data_fim, datetime.max.time())
+        
         # Buscar dados existentes para o período usando o método correto
         dados_existentes = repo.buscar_por_periodo(
             data_inicio, data_fim, cidade_id
@@ -67,65 +73,120 @@ def processar_coleta_dados(api_client, latitude, longitude, data_inicio, data_fi
     dados_salvos = 0
     erros = []
     
+    # Verificar duplicatas para todas as alturas antes de coletar
+    alturas_para_coletar = []
     for altura in alturas_selecionadas:
-        try:
-            # Verificar duplicatas antes de coletar
-            if verificar_dados_existentes(repo, cidade_id, fonte_id, data_inicio, data_fim, altura):
-                erros.append(f"Dados para altura {altura}m já existem no período selecionado")
-                continue
-            
-            # Coletar dados da API
-            st.info(f"🔄 Coletando dados para altura {altura}m...")
-            
-            dados_api = api_client.obter_dados_historicos_vento(
-                latitude=latitude,
-                longitude=longitude,
-                data_inicio=data_inicio,
-                data_fim=data_fim,
-                alturas=[altura]
-            )
-            
-            if not dados_api or 'dados' not in dados_api:
-                erros.append(f"Nenhum dado retornado para altura {altura}m")
-                continue
-            
-            # Processar e salvar cada registro
-            for registro in dados_api['dados']:
-                try:
-                    # Converter data se necessário - agora esperamos datetime
-                    if isinstance(registro['data_hora'], str):
-                        data_hora_registro = datetime.fromisoformat(registro['data_hora'])
-                    elif isinstance(registro['data_hora'], datetime):
-                        data_hora_registro = registro['data_hora']
-                    else:
-                        # Fallback - se ainda for date, converter para datetime
-                        data_hora_registro = datetime.combine(registro['data_hora'], datetime.min.time())
-                    
-                    # Usar altura do registro (pode ser diferente da altura solicitada)
-                    altura_registro = registro.get('altura_captura', altura)
-                    
-                    # Criar objeto MeteorologicalData
-                    dado_meteorologico = MeteorologicalData(
-                        cidade_id=cidade_id,
-                        meteorological_data_source_id=fonte_id,
-                        data_hora=data_hora_registro,
-                        temperatura=registro.get('temperatura'),
-                        umidade=registro.get('umidade'),
-                        velocidade_vento=registro['velocidade_vento'],
-                        altura_captura=altura_registro,
-                        created_at=datetime.now()
-                    )
-                    
-                    # Salvar no banco usando o método correto
-                    dado_id = repo.salvar(dado_meteorologico)
-                    if dado_id:
-                        dados_salvos += 1
-                    
-                except Exception as e:
-                    erros.append(f"Erro ao salvar registro {registro.get('data', 'N/A')} para altura {altura}m: {str(e)}")
-            
-        except Exception as e:
-            erros.append(f"Erro ao coletar dados para altura {altura}m: {str(e)}")
+        if verificar_dados_existentes(repo, cidade_id, fonte_id, data_inicio, data_fim, altura):
+            erros.append(f"Dados para altura {altura}m já existem no período selecionado")
+        else:
+            alturas_para_coletar.append(altura)
+    
+    # Se não há alturas para coletar, retornar
+    if not alturas_para_coletar:
+        return dados_salvos, erros
+    
+    try:
+        # Fazer uma única chamada da API com todas as alturas necessárias
+        st.info(f"🔄 Coletando dados para alturas: {', '.join([f'{h}m' for h in alturas_para_coletar])}...")
+        
+        dados_api = api_client.obter_dados_historicos_vento(
+            latitude=latitude,
+            longitude=longitude,
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+            alturas=alturas_para_coletar  # Todas as alturas em uma única chamada
+        )
+        
+        if not dados_api or 'dados' not in dados_api:
+            erros.append(f"Nenhum dado retornado para as alturas solicitadas")
+            return dados_salvos, erros
+        
+        # Processar e salvar cada registro
+        for registro in dados_api['dados']:
+            try:
+                # Converter data se necessário - agora esperamos datetime
+                if isinstance(registro['data_hora'], str):
+                    data_hora_registro = datetime.fromisoformat(registro['data_hora'])
+                elif isinstance(registro['data_hora'], datetime):
+                    data_hora_registro = registro['data_hora']
+                else:
+                    # Fallback - se ainda for date, converter para datetime
+                    data_hora_registro = datetime.combine(registro['data_hora'], datetime.min.time())
+                
+                # Usar altura do registro (pode ser diferente da altura solicitada)
+                altura_registro = registro.get('altura_captura')
+                if altura_registro is None:
+                    continue  # Pular registros sem altura definida
+                
+                # Verificar se esta altura estava nas alturas solicitadas
+                if altura_registro not in alturas_para_coletar:
+                    continue
+                
+                # Criar objeto MeteorologicalData
+                dado_meteorologico = MeteorologicalData(
+                    cidade_id=cidade_id,
+                    meteorological_data_source_id=fonte_id,
+                    data_hora=data_hora_registro,
+                    temperatura=registro.get('temperatura'),
+                    umidade=registro.get('umidade'),
+                    velocidade_vento=registro['velocidade_vento'],
+                    altura_captura=altura_registro,
+                    created_at=datetime.now()
+                )
+                
+                # Salvar no banco usando o método correto
+                dado_id = repo.salvar(dado_meteorologico)
+                if dado_id:
+                    dados_salvos += 1
+                
+            except Exception as e:
+                erros.append(f"Erro ao salvar registro {registro.get('data_hora', 'N/A')} para altura {registro.get('altura_captura', 'N/A')}m: {str(e)}")
+        
+        # Verificar se todas as alturas foram processadas e fornecer informações detalhadas
+        alturas_processadas = set()
+        alturas_com_dados_validos = set()
+        
+        for registro in dados_api['dados']:
+            altura_reg = registro.get('altura_captura')
+            if altura_reg and altura_reg in alturas_para_coletar:
+                alturas_processadas.add(altura_reg)
+                # Verificar se tem velocidade válida
+                if registro.get('velocidade_vento') is not None:
+                    alturas_com_dados_validos.add(altura_reg)
+        
+        # Verificar se a API retornou informações sobre todas as alturas (mesmo que sem dados)
+        dados_por_altura = dados_api.get('dados_por_altura', {})
+        alturas_na_resposta = set()
+        alturas_sem_dados = set()
+        
+        for altura in alturas_para_coletar:
+            altura_key = f"{altura}m"
+            if altura_key in dados_por_altura:
+                alturas_na_resposta.add(altura)
+                # Verificar se há dados válidos para esta altura
+                velocidades = dados_por_altura[altura_key].get('velocidades_vento', [])
+                velocidades_validas = [v for v in velocidades if v is not None]
+                if not velocidades_validas:
+                    alturas_sem_dados.add(altura)
+        
+        # Reportar alturas sem dados de forma mais informativa
+        if alturas_sem_dados:
+            alturas_str = ', '.join([f'{h}m' for h in sorted(alturas_sem_dados)])
+            erros.append(f"Alturas sem dados válidos na região/período: {alturas_str} (API retornou null para essas alturas)")
+        
+        alturas_nao_na_resposta = set(alturas_para_coletar) - alturas_na_resposta
+        if alturas_nao_na_resposta:
+            alturas_str = ', '.join([f'{h}m' for h in sorted(alturas_nao_na_resposta)])
+            erros.append(f"Alturas não incluídas na resposta da API: {alturas_str}")
+        
+        # Informar sobre alturas processadas com sucesso
+        if alturas_com_dados_validos:
+            alturas_str = ', '.join([f'{h}m' for h in sorted(alturas_com_dados_validos)])
+            st.success(f"✅ Dados coletados com sucesso para alturas: {alturas_str}")
+        
+        
+    except Exception as e:
+        erros.append(f"Erro ao coletar dados: {str(e)}")
     
     return dados_salvos, erros
 
@@ -143,142 +204,6 @@ def render_statistics_summary(met_repo):
     except:
         pass
 
-
-def render_api_source_selection_static(fontes_api):
-    """Renderiza seleção de fontes de API de forma estática para formulários"""
-    st.markdown("""
-    <div class='section-header-minor'>
-        <h4>🌪️ Fontes de Dados e Alturas</h4>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    if not fontes_api:
-        st.markdown("""
-        <div class='warning-box'>
-            <h4>Nenhuma Fonte Disponível</h4>
-            <p>Cadastre NASA_POWER ou OPEN_METEO primeiro na aba de fontes!</p>
-        </div>
-        """, unsafe_allow_html=True)
-        return {}
-    
-    # Verificar quais fontes estão disponíveis
-    nasa_disponivel = 'NASA_POWER' in fontes_api
-    meteo_disponivel = 'OPEN_METEO' in fontes_api
-    
-    selecoes = {}
-    
-    # Criar colunas estáticas para as duas principais fontes
-    col1, col2 = st.columns(2)
-    
-    # Coluna 1: NASA POWER
-    with col1:
-        if nasa_disponivel:
-            fonte_nasa = fontes_api['NASA_POWER']
-            
-            st.markdown("""
-            <div style='background: linear-gradient(135deg, #e74c3c22, #e74c3c11); 
-                        padding: 15px; border-radius: 10px; margin-bottom: 10px;
-                        border-left: 4px solid #e74c3c;'>
-                <h4 style='color: #e74c3c; margin: 0; display: flex; align-items: center;'>
-                    🛰️ NASA POWER
-                </h4>
-                <p style='margin: 5px 0 0 0; color: #666; font-size: 0.9em;'>Dados globais via satélite - Mais estável, processamento lento</p>
-                <p style='margin: 5px 0 0 0; color: #888; font-size: 0.85em;'>
-                    <strong>Alturas disponíveis:</strong> 10m, 50m
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            
-            st.markdown("**Selecione as alturas de captura:**")
-            
-            
-            alturas_nasa = []
-            
-            
-            if st.checkbox("📏 10m", key="NASA_POWER_10m"):
-                alturas_nasa.append(10)
-            
-            
-            if st.checkbox("📏 50m", key="NASA_POWER_50m"):
-                alturas_nasa.append(50)
-            
-            if alturas_nasa:
-                selecoes['NASA_POWER'] = {
-                    'fonte_obj': fonte_nasa,
-                    'alturas': alturas_nasa
-                }
-                alturas_str = ", ".join([f"{a}m" for a in alturas_nasa])
-                st.success(f"✅ NASA POWER: {len(alturas_nasa)} altura(s) - {alturas_str}")
-
-        else:
-            st.markdown("""
-            <div style='background: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid #6c757d;'>
-                <h4 style='color: #6c757d; margin: 0;'>🛰️ NASA POWER</h4>
-                <p style='margin: 5px 0 0 0; color: #999; font-size: 0.9em;'>Não disponível - cadastre a fonte primeiro</p>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    # Coluna 2: Open-Meteo
-    with col2:
-        if meteo_disponivel:
-            fonte_meteo = fontes_api['OPEN_METEO']
-            
-            st.markdown("""
-            <div style='background: linear-gradient(135deg, #3498db22, #3498db11); 
-                        padding: 15px; border-radius: 10px; margin-bottom: 10px;
-                        border-left: 4px solid #3498db;'>
-                <h4 style='color: #3498db; margin: 0; display: flex; align-items: center;'>
-                    🌍 OPEN METEO
-                </h4>
-                <p style='margin: 5px 0 0 0; color: #666; font-size: 0.9em;'>Dados históricos de alta resolução - Mais rápido, com limites</p>
-                <p style='margin: 5px 0 0 0; color: #888; font-size: 0.85em;'>
-                    <strong>Alturas disponíveis:</strong> 10m, 80m, 120m, 180m
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            
-            st.markdown("**Selecione as alturas de captura:**")
-            
-            # Checkboxes para alturas Open-Meteo
-            col_meteo1, col_meteo2 = st.columns(2)
-            col_meteo3, col_meteo4 = st.columns(2)
-            alturas_meteo = []
-            
-            
-            if st.checkbox("📏 10m", key="OPEN_METEO_10m"):
-                alturas_meteo.append(10)
-        
-        
-            if st.checkbox("📏 80m", key="OPEN_METEO_80m"):
-                alturas_meteo.append(80)
-        
-        
-            if st.checkbox("📏 120m", key="OPEN_METEO_120m"):
-                alturas_meteo.append(120)
-        
-        
-            if st.checkbox("📏 180m", key="OPEN_METEO_180m"):
-                alturas_meteo.append(180)
-            
-            if alturas_meteo:
-                selecoes['OPEN_METEO'] = {
-                    'fonte_obj': fonte_meteo,
-                    'alturas': alturas_meteo
-                }
-                alturas_str = ", ".join([f"{a}m" for a in alturas_meteo])
-                st.success(f"✅ Open-Meteo: {len(alturas_meteo)} altura(s) - {alturas_str}")
-
-        else:
-            st.markdown("""
-            <div style='background: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid #6c757d;'>
-                <h4 style='color: #6c757d; margin: 0;'>🌍 OPEN METEO</h4>
-                <p style='margin: 5px 0 0 0; color: #999; font-size: 0.9em;'>Não disponível - cadastre a fonte primeiro</p>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    return selecoes
 
 
 def create_meteorological_data():
@@ -354,7 +279,7 @@ def create_meteorological_data():
     with st.form("form_dados_meteorologicos", clear_on_submit=False, border=True):
         
         # Seção 1: Localização
-        column1, column2 = st.columns([3, 1], border=True)
+        column1, column2, column3, column4 = st.columns([2, 1, 1, 1], border=True)
         
         with column1:
             st.markdown("""
@@ -419,13 +344,133 @@ def create_meteorological_data():
                         st.warning("⚠️ Período muito extenso. Considere dividir em períodos menores.")
 
         # Seção 2: Seleção de Fontes e Alturas
-        st.markdown("---")
+        # st.markdown("---")
         
         # Filtrar fontes relacionadas às APIs
         fontes_api = {f.name: f for f in fontes if f.name in ['NASA_POWER', 'OPEN_METEO']}
         
         # Renderizar seleção de fontes (agora estática para formulários)
-        selecoes = render_api_source_selection_static(fontes_api)
+        # selecoes = render_api_source_selection_static(fontes_api, column2)
+        # st.markdown("""
+        # <div class='section-header-minor'>
+        #     <h4>🌪️ Fontes de Dados e Alturas</h4>
+        # </div>
+        # """, unsafe_allow_html=True)
+
+        if not fontes_api:
+            st.markdown("""
+            <div class='warning-box'>
+                <h4>Nenhuma Fonte Disponível</h4>
+                <p>Cadastre NASA_POWER ou OPEN_METEO primeiro na aba de fontes!</p>
+            </div>
+            """, unsafe_allow_html=True)
+            return {}
+
+        # Verificar quais fontes estão disponíveis
+        nasa_disponivel = 'NASA_POWER' in fontes_api
+        meteo_disponivel = 'OPEN_METEO' in fontes_api
+
+        selecoes = {}
+
+        # Criar colunas estáticas para as duas principais fontes
+        # Coluna 1: NASA POWER
+        with column3:
+            if nasa_disponivel:
+                fonte_nasa = fontes_api['NASA_POWER']
+
+                st.markdown("""
+                <div style='background: linear-gradient(135deg, #e74c3c22, #e74c3c11); 
+                            padding: 15px; border-radius: 10px; margin-bottom: 10px;
+                            border-left: 4px solid #e74c3c;'>
+                    <h4 style='color: #e74c3c; margin: 0; display: flex; align-items: center;'>
+                        🛰️ NASA POWER
+                    </h4>
+                    <p style='margin: 5px 0 0 0; color: #666; font-size: 0.9em;'>Dados globais via satélite - Mais estável, processamento lento</p>
+                    <p style='margin: 5px 0 0 0; color: #888; font-size: 0.85em;'>
+                        <strong>Alturas disponíveis:</strong> 10m, 50m
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+
+
+                st.markdown("**Selecione as alturas de captura:**")
+
+
+                alturas_nasa = []
+
+
+                if st.checkbox("📏 10m", key="NASA_POWER_10m"):
+                    alturas_nasa.append(10)
+
+
+                if st.checkbox("📏 50m", key="NASA_POWER_50m"):
+                    alturas_nasa.append(50)
+
+                if alturas_nasa:
+                    selecoes['NASA_POWER'] = {
+                        'fonte_obj': fonte_nasa,
+                        'alturas': alturas_nasa
+                    }
+                    alturas_str = ", ".join([f"{a}m" for a in alturas_nasa])
+                    st.success(f"✅ NASA POWER: {len(alturas_nasa)} altura(s) - {alturas_str}")
+
+            else:
+                st.markdown("""
+                <div style='background: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid #6c757d;'>
+                    <h4 style='color: #6c757d; margin: 0;'>🛰️ NASA POWER</h4>
+                    <p style='margin: 5px 0 0 0; color: #999; font-size: 0.9em;'>Não disponível - cadastre a fonte primeiro</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # Coluna 2: Open-Meteo
+        with column4:
+            if meteo_disponivel:
+                fonte_meteo = fontes_api['OPEN_METEO']
+
+                st.markdown("""
+                <div style='background: linear-gradient(135deg, #3498db22, #3498db11); 
+                            padding: 15px; border-radius: 10px; margin-bottom: 10px;
+                            border-left: 4px solid #3498db;'>
+                    <h4 style='color: #3498db; margin: 0; display: flex; align-items: center;'>
+                        🌍 OPEN METEO
+                    </h4>
+                    <p style='margin: 5px 0 0 0; color: #666; font-size: 0.9em;'>Dados históricos de alta resolução - Mais rápido, com limites</p>
+                    <p style='margin: 5px 0 0 0; color: #888; font-size: 0.85em;'>
+                        <strong>Alturas:</strong> 10m ✅ 
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+
+
+                st.markdown("**Selecione as alturas de captura:**")
+
+                # Checkboxes para alturas Open-Meteo
+                col_meteo1, col_meteo2 = st.columns(2)
+                col_meteo3, col_meteo4 = st.columns(2)
+                alturas_meteo = []
+
+
+                if st.checkbox("📏 10m", key="OPEN_METEO_10m"):
+                    alturas_meteo.append(10)
+
+
+                
+
+                if alturas_meteo:
+                    selecoes['OPEN_METEO'] = {
+                        'fonte_obj': fonte_meteo,
+                        'alturas': alturas_meteo
+                    }
+                    alturas_str = ", ".join([f"{a}m" for a in alturas_meteo])
+                    st.success(f"✅ Open-Meteo: {len(alturas_meteo)} altura(s) - {alturas_str}")
+
+            else:
+                st.markdown("""
+                <div style='background: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid #6c757d;'>
+                    <h4 style='color: #6c757d; margin: 0;'>🌍 OPEN METEO</h4>
+                    <p style='margin: 5px 0 0 0; color: #999; font-size: 0.9em;'>Não disponível - cadastre a fonte primeiro</p>
+                </div>
+                """, unsafe_allow_html=True)
 
         # Seção 3: Botões de ação
         st.markdown("---")
@@ -571,6 +616,10 @@ def create_meteorological_data():
         • NASA POWER: mais lento, mais estável
         • Open-Meteo: mais rápido, com limites diários
         • Períodos longos podem demorar mais
+        
+        **⚠️ Limitações Open-Meteo:**
+        • Apenas 10m tem dados consistentes globalmente
+        • Isso é uma limitação atual da API Open-Meteo, não do sistema
         """)
     
     with col2:

@@ -74,7 +74,8 @@ def carregar_dados_cidade(cidade_id, met_repo, fonte_repo):
         
         df = pd.DataFrame(df_data)
         if not df.empty:
-            df['data_hora'] = pd.to_datetime(df['data_hora'])
+            # Normalizar timestamps para evitar problemas de timezone
+            df['data_hora'] = pd.to_datetime(df['data_hora'], utc=True).dt.tz_localize(None)
             df = df.sort_values('data_hora')
         
         return dados_cidade, df

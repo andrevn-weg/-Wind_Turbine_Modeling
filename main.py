@@ -11,12 +11,13 @@ import sys
 # Adicionar src ao path
 src_path = Path(__file__).parent / "src"
 sys.path.insert(0, str(src_path))
-
+# Configuração do Streamlit
+st.logo(image="src/images/UFSM-CS_horizontal_cor.png",icon_image="src/images/UFSM-CS_horizontal_cor.png", size="large",link="https://www.ufsm.br/cursos/graduacao/cachoeira-do-sul/engenharia-eletrica")
+        
 st.set_page_config(
-    page_title="Simulador de Turbina Eólica",
     layout="wide",
     initial_sidebar_state="expanded",
-    page_icon="🌪️"
+
 )
 
 # Import CSS loader
@@ -45,4 +46,5 @@ pages = {
 
 # Navegação
 pg = st.navigation(pages=pages, expanded=True)
+
 pg.run()
