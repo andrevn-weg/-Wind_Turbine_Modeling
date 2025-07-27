@@ -119,10 +119,12 @@ class OpenMeteoClient:
         longitude: float,
         data_inicio: Union[str, date],
         data_fim: Union[str, date],
-        alturas: Optional[List[int]] = None
+        alturas: Optional[List[int]] = None,
+        incluir_temperatura: bool = True,
+        incluir_umidade: bool = True
     ) -> Dict:
         """
-        Obtém dados históricos de velocidade do vento para uma localização específica.
+        Obtém dados históricos de velocidade do vento, temperatura e umidade para uma localização específica.
         
         Args:
             latitude: Latitude da localização (-90 a 90)
@@ -130,9 +132,16 @@ class OpenMeteoClient:
             data_inicio: Data de início (formato: YYYY-MM-DD ou objeto date)
             data_fim: Data de fim (formato: YYYY-MM-DD ou objeto date)
             alturas: Lista de alturas em metros. Se None, usa todas as alturas suportadas
+            incluir_temperatura: Se deve incluir dados de temperatura a 2m (padrão: True)
+            incluir_umidade: Se deve incluir dados de umidade relativa a 2m (padrão: True)
             
         Returns:
-            Dict: Dados meteorológicos organizados por altura
+            Dict: Dados meteorológicos organizados por altura, incluindo temperatura e umidade
+            
+        Note:
+            - Velocidade do vento: obtida nas alturas especificadas (10m, 80m, 120m, 180m)
+            - Temperatura: sempre obtida a 2 metros de altura
+            - Umidade relativa: sempre obtida a 2 metros de altura
         """
         # Validar parâmetros
         self._validar_parametros(latitude, longitude, data_inicio, data_fim)
@@ -147,14 +156,15 @@ class OpenMeteoClient:
         
         # Usar cliente otimizado ou básico
         if self.client_type == "optimized":
-            return self._obter_dados_otimizado(latitude, longitude, data_inicio, data_fim, alturas)
+            return self._obter_dados_otimizado(latitude, longitude, data_inicio, data_fim, alturas, incluir_temperatura, incluir_umidade)
         else:
-            return self._obter_dados_basico(latitude, longitude, data_inicio, data_fim, alturas)
+            return self._obter_dados_basico(latitude, longitude, data_inicio, data_fim, alturas, incluir_temperatura, incluir_umidade)
     
     def _obter_dados_otimizado(self, latitude: float, longitude: float, 
                               data_inicio: Union[str, date], data_fim: Union[str, date], 
-                              alturas: List[int]) -> Dict:
-        """Obtém dados usando o cliente otimizado (baseado no exemplo oficial)."""
+                              alturas: List[int], incluir_temperatura: bool = True, 
+                              incluir_umidade: bool = True) -> Dict:
+        """Obtém dados usando o cliente otimizado com temperatura e umidade (baseado no exemplo oficial)."""
         
         # Converter datas para string se necessário
         if isinstance(data_inicio, date):
@@ -162,13 +172,22 @@ class OpenMeteoClient:
         if isinstance(data_fim, date):
             data_fim = data_fim.strftime('%Y-%m-%d')
         
+        # Construir lista de parâmetros horários
+        parametros_horarios = [f"wind_speed_{altura}m" for altura in alturas]
+        
+        # Adicionar temperatura e umidade se solicitados
+        if incluir_temperatura:
+            parametros_horarios.append("temperature_2m")
+        if incluir_umidade:
+            parametros_horarios.append("relative_humidity_2m")
+        
         # Construir parâmetros como no exemplo oficial
         params = {
             "latitude": latitude,
             "longitude": longitude,
             "start_date": data_inicio,
             "end_date": data_fim,
-            "hourly": [f"wind_speed_{altura}m" for altura in alturas],
+            "hourly": parametros_horarios,
             "timezone": "auto",
             "wind_speed_unit": "ms"
         }
@@ -197,23 +216,46 @@ class OpenMeteoClient:
             }
             
             # Extrair dados de velocidade do vento para cada altura
+            variable_index = 0
             for i, altura in enumerate(alturas):
-                wind_data = hourly.Variables(i).ValuesAsNumpy()
+                wind_data = hourly.Variables(variable_index).ValuesAsNumpy()
                 hourly_data[f"wind_speed_{altura}m"] = wind_data
+                variable_index += 1
+            
+            # Extrair temperatura se solicitada
+            if incluir_temperatura:
+                try:
+                    temperature_data = hourly.Variables(variable_index).ValuesAsNumpy()
+                    hourly_data["temperature_2m"] = temperature_data
+                    variable_index += 1
+                except Exception as e:
+                    # Se falhar, usar valores None
+                    hourly_data["temperature_2m"] = [None] * len(hourly_data["date"])
+            
+            # Extrair umidade se solicitada
+            if incluir_umidade:
+                try:
+                    humidity_data = hourly.Variables(variable_index).ValuesAsNumpy()
+                    hourly_data["relative_humidity_2m"] = humidity_data
+                    variable_index += 1
+                except Exception as e:
+                    # Se falhar, usar valores None
+                    hourly_data["relative_humidity_2m"] = [None] * len(hourly_data["date"])
             
             # Criar DataFrame
             df = pd.DataFrame(data=hourly_data)
             
             # Converter para formato esperado pelo sistema
-            return self._converter_dataframe_para_formato_sistema(df, alturas, response)
+            return self._converter_dataframe_para_formato_sistema(df, alturas, response, incluir_temperatura, incluir_umidade)
             
         except Exception as e:
             raise Exception(f"Erro no cliente otimizado Open-Meteo: {e}")
     
     def _obter_dados_basico(self, latitude: float, longitude: float, 
                            data_inicio: Union[str, date], data_fim: Union[str, date], 
-                           alturas: List[int]) -> Dict:
-        """Obtém dados usando requests básico (código atual melhorado)."""
+                           alturas: List[int], incluir_temperatura: bool = True, 
+                           incluir_umidade: bool = True) -> Dict:
+        """Obtém dados usando requests básico com temperatura e umidade (código melhorado)."""
         
         # Converter datas para string se necessário
         if isinstance(data_inicio, date):
@@ -221,13 +263,22 @@ class OpenMeteoClient:
         if isinstance(data_fim, date):
             data_fim = data_fim.strftime('%Y-%m-%d')
         
+        # Construir lista de parâmetros horários
+        parametros_horarios = [f"wind_speed_{altura}m" for altura in alturas]
+        
+        # Adicionar temperatura e umidade se solicitados
+        if incluir_temperatura:
+            parametros_horarios.append("temperature_2m")
+        if incluir_umidade:
+            parametros_horarios.append("relative_humidity_2m")
+        
         # Construir parâmetros da requisição
         params = {
             'latitude': latitude,
             'longitude': longitude,
             'start_date': data_inicio,
             'end_date': data_fim,
-            'hourly': ','.join([f"wind_speed_{altura}m" for altura in alturas]),
+            'hourly': ','.join(parametros_horarios),
             'timezone': 'auto',
             'wind_speed_unit': 'ms'
         }
@@ -243,13 +294,14 @@ class OpenMeteoClient:
             
             # Processar resposta
             data = response.json()
-            return self._processar_resposta_basica(data, alturas)
+            return self._processar_resposta_basica(data, alturas, incluir_temperatura, incluir_umidade)
             
         except requests.RequestException as e:
             raise requests.RequestException(f"Erro na requisição Open-Meteo: {e}")
     
-    def _converter_dataframe_para_formato_sistema(self, df: pd.DataFrame, alturas: List[int], response) -> Dict:
-        """Converte o DataFrame otimizado para o formato esperado pelo sistema."""
+    def _converter_dataframe_para_formato_sistema(self, df: pd.DataFrame, alturas: List[int], response, 
+                                                 incluir_temperatura: bool = True, incluir_umidade: bool = True) -> Dict:
+        """Converte o DataFrame otimizado para o formato esperado pelo sistema, incluindo temperatura e umidade."""
         
         resultado = {
             'metadata': {
@@ -261,7 +313,17 @@ class OpenMeteoClient:
                 'periodo_inicio': df['date'].iloc[0].strftime('%Y-%m-%d %H:%M:%S') if len(df) > 0 else None,
                 'periodo_fim': df['date'].iloc[-1].strftime('%Y-%m-%d %H:%M:%S') if len(df) > 0 else None,
                 'total_registros': len(df),
-                'fonte': 'Open-Meteo'
+                'fonte': 'Open-Meteo',
+                'dados_incluidos': {
+                    'velocidade_vento': True,
+                    'temperatura': incluir_temperatura and 'temperature_2m' in df.columns,
+                    'umidade': incluir_umidade and 'relative_humidity_2m' in df.columns
+                },
+                'alturas_dados': {
+                    'velocidade_vento': f"{', '.join([str(h) for h in alturas])}m",
+                    'temperatura': "2m" if incluir_temperatura and 'temperature_2m' in df.columns else "N/A",
+                    'umidade': "2m" if incluir_umidade and 'relative_humidity_2m' in df.columns else "N/A"
+                }
             },
             'dados_por_altura': {},
             'dados': []
@@ -304,23 +366,40 @@ class OpenMeteoClient:
                 # Adicionar registros individuais para interface
                 for i, row in df.iterrows():
                     if pd.notna(row[col_name]):
+                        # Extrair temperatura se disponível
+                        temperatura = None
+                        if incluir_temperatura and 'temperature_2m' in df.columns:
+                            temp_val = row['temperature_2m']
+                            temperatura = float(temp_val) if pd.notna(temp_val) else None
+                        
+                        # Extrair umidade se disponível
+                        umidade = None
+                        if incluir_umidade and 'relative_humidity_2m' in df.columns:
+                            humid_val = row['relative_humidity_2m']
+                            umidade = float(humid_val) if pd.notna(humid_val) else None
+                        
                         resultado['dados'].append({
                             'data_hora': row['date'].to_pydatetime(),
-                            'temperatura': None,
-                            'umidade': None,
+                            'temperatura': temperatura,
+                            'umidade': umidade,
                             'velocidade_vento': float(row[col_name]),
                             'altura_captura': altura
                         })
         
         return resultado
     
-    def _processar_resposta_basica(self, data: Dict, alturas: List[int]) -> Dict:
-        """Processa resposta do cliente básico (código atual mantido para compatibilidade)."""
+    def _processar_resposta_basica(self, data: Dict, alturas: List[int], 
+                                  incluir_temperatura: bool = True, incluir_umidade: bool = True) -> Dict:
+        """Processa resposta do cliente básico com temperatura e umidade (código mantido para compatibilidade)."""
         if 'hourly' not in data:
             raise ValueError("Resposta da API não contém dados horários")
         
         hourly_data = data['hourly']
         timestamps = hourly_data.get('time', [])
+        
+        # Verificar se há dados de temperatura e umidade disponíveis
+        temperatura_disponivel = incluir_temperatura and 'temperature_2m' in hourly_data
+        umidade_disponivel = incluir_umidade and 'relative_humidity_2m' in hourly_data
         
         # Organizar dados por altura
         resultado = {
@@ -332,11 +411,25 @@ class OpenMeteoClient:
                 'periodo_inicio': timestamps[0] if timestamps else None,
                 'periodo_fim': timestamps[-1] if timestamps else None,
                 'total_registros': len(timestamps),
-                'fonte': 'Open-Meteo'
+                'fonte': 'Open-Meteo',
+                'dados_incluidos': {
+                    'velocidade_vento': True,
+                    'temperatura': temperatura_disponivel,
+                    'umidade': umidade_disponivel
+                },
+                'alturas_dados': {
+                    'velocidade_vento': f"{', '.join([str(h) for h in alturas])}m",
+                    'temperatura': "2m" if temperatura_disponivel else "N/A",
+                    'umidade': "2m" if umidade_disponivel else "N/A"
+                }
             },
             'dados_por_altura': {},
             'dados': []
         }
+        
+        # Extrair dados de temperatura e umidade
+        temperaturas = hourly_data.get('temperature_2m', []) if temperatura_disponivel else []
+        umidades = hourly_data.get('relative_humidity_2m', []) if umidade_disponivel else []
         
         # Processar dados por altura
         for altura in alturas:
@@ -375,10 +468,21 @@ class OpenMeteoClient:
                 if i < len(velocidades) and velocidades[i] is not None:
                     try:
                         data_hora_registro = datetime.fromisoformat(timestamp.replace('T', ' '))
+                        
+                        # Extrair temperatura se disponível
+                        temperatura = None
+                        if temperatura_disponivel and i < len(temperaturas):
+                            temperatura = temperaturas[i] if temperaturas[i] is not None else None
+                        
+                        # Extrair umidade se disponível
+                        umidade = None
+                        if umidade_disponivel and i < len(umidades):
+                            umidade = umidades[i] if umidades[i] is not None else None
+                        
                         resultado['dados'].append({
                             'data_hora': data_hora_registro,
-                            'temperatura': None,
-                            'umidade': None,
+                            'temperatura': temperatura,
+                            'umidade': umidade,
                             'velocidade_vento': velocidades[i],
                             'altura_captura': altura
                         })

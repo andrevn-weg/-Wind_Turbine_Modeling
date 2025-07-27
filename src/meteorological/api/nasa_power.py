@@ -71,10 +71,12 @@ class NASAPowerClient:
         longitude: float,
         data_inicio: Union[str, date],
         data_fim: Union[str, date],
-        alturas: Optional[List[int]] = None
+        alturas: Optional[List[int]] = None,
+        incluir_temperatura: bool = True,
+        incluir_umidade: bool = True
     ) -> Dict:
         """
-        Obtém dados históricos de velocidade do vento para uma localização específica.
+        Obtém dados históricos de velocidade do vento, temperatura e umidade para uma localização específica.
         
         Args:
             latitude: Latitude da localização (-90 a 90)
@@ -82,13 +84,20 @@ class NASAPowerClient:
             data_inicio: Data de início (formato: YYYYMMDD ou objeto date)
             data_fim: Data de fim (formato: YYYYMMDD ou objeto date)
             alturas: Lista de alturas em metros. Se None, usa todas as alturas suportadas
+            incluir_temperatura: Se deve incluir dados de temperatura a 2m (padrão: True)
+            incluir_umidade: Se deve incluir dados de umidade relativa a 2m (padrão: True)
             
         Returns:
-            Dict: Dados meteorológicos organizados por altura
+            Dict: Dados meteorológicos organizados por altura, incluindo temperatura e umidade
             
         Raises:
             ValueError: Se parâmetros inválidos
             requests.RequestException: Se erro na requisição HTTP
+            
+        Note:
+            - Velocidade do vento: obtida nas alturas especificadas (10m, 50m)
+            - Temperatura: sempre obtida a 2 metros de altura
+            - Umidade relativa: sempre obtida a 2 metros de altura
         """
         # Validar parâmetros
         if not (-90 <= latitude <= 90):
@@ -123,7 +132,7 @@ class NASAPowerClient:
             'latitude': latitude,
             'longitude': longitude,
             'community': 'RE',  # Renewable Energy community
-            'parameters': self._construir_parametros_vento(alturas),
+            'parameters': self._construir_parametros_meteorologicos(alturas, incluir_temperatura, incluir_umidade),
             'format': 'JSON',
             'header': 'true',
             'time-standard': 'UTC'
@@ -140,7 +149,7 @@ class NASAPowerClient:
             
             # Processar resposta
             data = response.json()
-            return self._processar_resposta(data, alturas, latitude, longitude)
+            return self._processar_resposta(data, alturas, latitude, longitude, incluir_temperatura, incluir_umidade)
             
         except requests.RequestException as e:
             raise requests.RequestException(f"Erro na requisição NASA POWER: {e}")
@@ -150,16 +159,20 @@ class NASAPowerClient:
         latitude: float,
         longitude: float,
         ano: int,
-        alturas: Optional[List[int]] = None
+        alturas: Optional[List[int]] = None,
+        incluir_temperatura: bool = True,
+        incluir_umidade: bool = True
     ) -> Dict:
         """
-        Obtém dados históricos de vento para um ano completo.
+        Obtém dados históricos de vento, temperatura e umidade para um ano completo.
         
         Args:
             latitude: Latitude da localização
             longitude: Longitude da localização
             ano: Ano desejado (ex: 2024)
             alturas: Lista de alturas em metros
+            incluir_temperatura: Se deve incluir dados de temperatura
+            incluir_umidade: Se deve incluir dados de umidade
             
         Returns:
             Dict: Dados meteorológicos do ano completo
@@ -172,7 +185,9 @@ class NASAPowerClient:
             longitude=longitude,
             data_inicio=data_inicio,
             data_fim=data_fim,
-            alturas=alturas
+            alturas=alturas,
+            incluir_temperatura=incluir_temperatura,
+            incluir_umidade=incluir_umidade
         )
     
     def obter_dados_ultimo_ano(
@@ -253,15 +268,49 @@ class NASAPowerClient:
         
         return ','.join(parametros)
     
-    def _processar_resposta(self, data: Dict, alturas: List[int], lat: float, lon: float) -> Dict:
+    def _construir_parametros_meteorologicos(self, alturas: List[int], incluir_temperatura: bool = True, incluir_umidade: bool = True) -> str:
         """
-        Processa a resposta da API organizando os dados por altura.
+        Constrói a string de parâmetros completa incluindo vento, temperatura e umidade.
+        
+        Args:
+            alturas: Lista de alturas em metros para velocidade do vento
+            incluir_temperatura: Se deve incluir temperatura
+            incluir_umidade: Se deve incluir umidade relativa
+            
+        Returns:
+            str: Parâmetros separados por vírgula para a API NASA POWER
+        """
+        parametros = []
+        
+        # Adicionar parâmetros de vento
+        for altura in alturas:
+            if altura == 10:
+                parametros.append("WS10M")  # Wind Speed at 10 Meters
+            elif altura == 50:
+                parametros.append("WS50M")  # Wind Speed at 50 Meters
+        
+        # Adicionar temperatura se solicitada
+        if incluir_temperatura:
+            parametros.append("T2M")  # Temperature at 2 Meters
+        
+        # Adicionar umidade relativa se solicitada
+        if incluir_umidade:
+            parametros.append("RH2M")  # Relative Humidity at 2 Meters
+        
+        return ','.join(parametros)
+    
+    def _processar_resposta(self, data: Dict, alturas: List[int], lat: float, lon: float, 
+                           incluir_temperatura: bool = True, incluir_umidade: bool = True) -> Dict:
+        """
+        Processa a resposta da API organizando os dados por altura, incluindo temperatura e umidade.
         
         Args:
             data: Dados brutos da API
             alturas: Lista de alturas solicitadas
             lat: Latitude da requisição
             lon: Longitude da requisição
+            incluir_temperatura: Se dados de temperatura foram solicitados
+            incluir_umidade: Se dados de umidade foram solicitados
             
         Returns:
             Dict: Dados organizados por altura e processados
@@ -272,51 +321,78 @@ class NASAPowerClient:
         properties = data['properties']
         parameter_data = properties.get('parameter', {})
         
-        # Extrair timestamps dos dados (usar a primeira variável disponível)
-        timestamps = []
-        primeira_variavel = None
-        for param in parameter_data:
-            if parameter_data[param]:
-                primeira_variavel = param
-                timestamps = list(parameter_data[param].keys())
-                break
+        # Verificar se há dados válidos
+        if not parameter_data:
+            raise ValueError("API NASA POWER retornou dados vazios para os parâmetros solicitados")
         
-        # Organizar dados por altura
+        # Verificar disponibilidade de dados por parâmetro
+        temperatura_disponivel = incluir_temperatura and 'T2M' in parameter_data and bool(parameter_data['T2M'])
+        umidade_disponivel = incluir_umidade and 'RH2M' in parameter_data and bool(parameter_data['RH2M'])
+        
+        # Extrair dados de temperatura e umidade
+        dados_temperatura = parameter_data.get('T2M', {}) if temperatura_disponivel else {}
+        dados_umidade = parameter_data.get('RH2M', {}) if umidade_disponivel else {}
+        
+        # Inicializar estrutura de resultado
         resultado = {
             'metadata': {
+                'fonte': 'NASA POWER',
                 'latitude': lat,
                 'longitude': lon,
-                'fonte': 'NASA POWER',
-                'periodo_inicio': timestamps[0] if timestamps else None,
-                'periodo_fim': timestamps[-1] if timestamps else None,
-                'total_registros': len(timestamps),
+                'dados_incluidos': {
+                    'velocidade_vento': True,
+                    'temperatura': temperatura_disponivel,
+                    'umidade': umidade_disponivel
+                },
+                'alturas_dados': {
+                    'velocidade_vento': f"{', '.join([str(h) for h in alturas])}m",
+                    'temperatura': "2m" if temperatura_disponivel else "N/A",
+                    'umidade': "2m" if umidade_disponivel else "N/A"
+                },
                 'header': data.get('header', {}),
                 'mensagens': data.get('messages', [])
             },
             'dados_por_altura': {},
-            'dados': []  # Formato compatível com interface
+            'dados': []
         }
         
-        # Processar dados por altura e criar lista de registros diários
-        registros_por_data = {}
+        # Coletar todos os timestamps únicos de todos os parâmetros
+        todos_timestamps = set()
+        
+        # Processar dados por altura de vento
+        alturas_com_dados = []
         
         for altura in alturas:
-            # Mapear altura para parâmetro NASA
+            # Determinar parâmetro NASA POWER baseado na altura
             if altura == 10:
-                param_nasa = "WS10M"
+                parametro_vento = "WS10M"
             elif altura == 50:
-                param_nasa = "WS50M"
+                parametro_vento = "WS50M"
             else:
-                continue  # Não deveria acontecer devido à validação
+                continue  # Altura não suportada pela NASA POWER
             
-            velocidades_dict = parameter_data.get(param_nasa, {})
+            # Verificar se dados estão disponíveis para esta altura
+            if parametro_vento not in parameter_data or not parameter_data[parametro_vento]:
+                print(f"⚠️ Dados não disponíveis para altura {altura}m (parâmetro {parametro_vento})")
+                continue
             
-            # Converter para listas ordenadas por timestamp
-            timestamps_ordenados = sorted(velocidades_dict.keys())
-            velocidades = [velocidades_dict[ts] for ts in timestamps_ordenados]
+            dados_vento = parameter_data[parametro_vento]
+            alturas_com_dados.append(altura)
+            
+            # Coletar timestamps deste parâmetro
+            todos_timestamps.update(dados_vento.keys())
+            
+            # Processar dados de vento para esta altura
+            timestamps_ordenados = sorted(dados_vento.keys())
+            velocidades = []
+            
+            for timestamp in timestamps_ordenados:
+                velocidade = dados_vento[timestamp]
+                # Converter -999 (valor faltante NASA) para None
+                velocidades.append(velocidade if velocidade != -999 else None)
             
             # Calcular estatísticas básicas
-            velocidades_validas = [v for v in velocidades if v is not None and v != -999]
+            velocidades_validas = [v for v in velocidades if v is not None]
             
             if velocidades_validas:
                 estatisticas = {
@@ -335,75 +411,74 @@ class NASAPowerClient:
                     'registros_nulos': len(velocidades)
                 }
             
+            # Adicionar dados organizados por altura
             resultado['dados_por_altura'][f"{altura}m"] = {
                 'altura_metros': altura,
-                'parametro_nasa': param_nasa,
+                'parametro_nasa': parametro_vento,
                 'timestamps': timestamps_ordenados,
                 'velocidades_vento': velocidades,
                 'estatisticas': estatisticas
             }
-            
-            # Converter timestamps e velocidades em registros horários para interface
-            for i, timestamp in enumerate(timestamps_ordenados):
-                # Converter timestamp YYYYMMDDHH para datetime completo
-                try:
-                    # Extrair data e hora do timestamp NASA POWER (formato: YYYYMMDDHH)
-                    if len(timestamp) >= 10:
-                        data_hora_str = timestamp[:8] + timestamp[8:10]  # YYYYMMDDHH
-                        data_hora_registro = datetime.strptime(data_hora_str, '%Y%m%d%H')
-                    else:
-                        # Fallback para apenas data (meio-dia como padrão)
-                        data_hora_registro = datetime.strptime(timestamp[:8], '%Y%m%d').replace(hour=12)
-                    velocidade = velocidades[i]
-                    
-                    # Criar chave única por data e hora
-                    data_hora_str = data_hora_registro.strftime('%Y-%m-%d %H:%M:%S')
-                    
-                    if data_hora_str not in registros_por_data:
-                        registros_por_data[data_hora_str] = {
-                            'data_hora': data_hora_registro,
-                            'temperaturas': [],
-                            'umidades': [],
-                            'velocidades_vento': [],
-                            'alturas': []
-                        }
-                    
-                    # Adicionar dados desta altura se velocidade válida
-                    if velocidade is not None and velocidade != -999:
-                        registros_por_data[data_hora_str]['velocidades_vento'].append(velocidade)
-                        registros_por_data[data_hora_str]['alturas'].append(altura)
-                        # NASA POWER não fornece temperatura e umidade diretamente
-                        registros_por_data[data_hora_str]['temperaturas'].append(None)
-                        registros_por_data[data_hora_str]['umidades'].append(None)
-                        
-                except ValueError:
-                    continue  # Pular timestamps inválidos
         
-        # Converter registros agrupados em formato final esperado pela interface
-        for data_hora_str, dados_registro in registros_por_data.items():
-            if dados_registro['velocidades_vento']:  # Só incluir se há dados válidos
-                # Para cada altura que tem dados neste registro
-                alturas_unicas = list(set(dados_registro['alturas']))
+        # Verificar se conseguimos dados de pelo menos uma altura
+        if not alturas_com_dados:
+            raise ValueError(f"Nenhum dado de vento disponível para as alturas solicitadas: {alturas}")
+        
+        # Processar registros individuais combinando dados de todas as alturas
+        todos_timestamps_ordenados = sorted(todos_timestamps)
+        
+        for timestamp in todos_timestamps_ordenados:
+            try:
+                # Converter timestamp NASA POWER para datetime
+                # Formato pode ser YYYYMMDDHH ou YYYYMMDD
+                if len(timestamp) >= 10:  # Com hora
+                    data_hora_registro = datetime.strptime(timestamp, '%Y%m%d%H')
+                else:  # Apenas data
+                    data_hora_registro = datetime.strptime(timestamp, '%Y%m%d').replace(hour=12)
                 
-                for altura_unica in alturas_unicas:
-                    # Filtrar velocidades desta altura específica
-                    velocidades_altura = [
-                        dados_registro['velocidades_vento'][i] 
-                        for i, h in enumerate(dados_registro['alturas']) 
-                        if h == altura_unica
-                    ]
+                # Para cada altura que tem dados neste timestamp
+                for altura in alturas_com_dados:
+                    parametro_vento = "WS10M" if altura == 10 else "WS50M"
+                    dados_vento = parameter_data[parametro_vento]
                     
-                    if velocidades_altura:
-                        # Calcular média para esta altura
-                        velocidade_media = sum(velocidades_altura) / len(velocidades_altura)
-                        
-                        resultado['dados'].append({
-                            'data_hora': dados_registro['data_hora'],
-                            'temperatura': None,  # NASA POWER não fornece temperatura por padrão
-                            'umidade': None,      # NASA POWER não fornece umidade por padrão
-                            'velocidade_vento': velocidade_media,
-                            'altura_captura': altura_unica
-                        })
+                    if timestamp in dados_vento:
+                        velocidade = dados_vento[timestamp]
+                        if velocidade != -999:  # Apenas incluir valores válidos
+                            
+                            # Obter temperatura para este timestamp (se disponível)
+                            temperatura = None
+                            if temperatura_disponivel and timestamp in dados_temperatura:
+                                temp_val = dados_temperatura[timestamp]
+                                temperatura = temp_val if temp_val != -999 else None
+                            
+                            # Obter umidade para este timestamp (se disponível)
+                            umidade = None
+                            if umidade_disponivel and timestamp in dados_umidade:
+                                umid_val = dados_umidade[timestamp]
+                                umidade = umid_val if umid_val != -999 else None
+                            
+                            # Adicionar registro
+                            resultado['dados'].append({
+                                'data_hora': data_hora_registro,
+                                'temperatura': temperatura,
+                                'umidade': umidade,
+                                'velocidade_vento': velocidade,
+                                'altura_captura': altura
+                            })
+                            
+            except ValueError as e:
+                print(f"⚠️ Erro ao processar timestamp {timestamp}: {e}")
+                continue
+        
+        # Adicionar informações de período aos metadados
+        if resultado['dados']:
+            resultado['metadata']['periodo_inicio'] = min(d['data_hora'] for d in resultado['dados']).strftime('%Y-%m-%d %H:%M:%S')
+            resultado['metadata']['periodo_fim'] = max(d['data_hora'] for d in resultado['dados']).strftime('%Y-%m-%d %H:%M:%S')
+            resultado['metadata']['total_registros'] = len(resultado['dados'])
+        else:
+            resultado['metadata']['periodo_inicio'] = None
+            resultado['metadata']['periodo_fim'] = None
+            resultado['metadata']['total_registros'] = 0
         
         return resultado
     
