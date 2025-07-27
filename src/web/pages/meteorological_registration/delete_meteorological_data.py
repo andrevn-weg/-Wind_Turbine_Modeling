@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 from datetime import datetime, date, timedelta
 import pandas as pd
+import traceback
 
 # Adicionar src ao path para imports
 src_path = Path(__file__).parent.parent.parent.parent / "src"
@@ -73,6 +74,36 @@ def obter_cidades_com_dados():
         return []
 
 
+def debug_dados_cidade(cidade_id):
+    """
+    Função de debug para investigar problemas nos dados
+    """
+    try:
+        repo_dados = MeteorologicalDataRepository()
+        dados_cidade = repo_dados.buscar_por_cidade(cidade_id)
+        
+        if not dados_cidade:
+            return "Nenhum dado encontrado"
+        
+        debug_info = []
+        debug_info.append(f"Total de registros encontrados: {len(dados_cidade)}")
+        
+        for i, dado in enumerate(dados_cidade[:5]):  # Apenas os primeiros 5 para debug
+            debug_info.append(f"\nRegistro {i+1}:")
+            debug_info.append(f"  ID: {dado.id}")
+            debug_info.append(f"  Data/Hora: {dado.data_hora} (tipo: {type(dado.data_hora)})")
+            debug_info.append(f"  Altura: {dado.altura_captura} (tipo: {type(dado.altura_captura)})")
+            debug_info.append(f"  Fonte ID: {dado.meteorological_data_source_id}")
+            
+            if hasattr(dado.data_hora, 'tzinfo'):
+                debug_info.append(f"  Timezone: {dado.data_hora.tzinfo}")
+        
+        return "\n".join(debug_info)
+        
+    except Exception as e:
+        return f"Erro no debug: {str(e)}"
+
+
 def obter_estatisticas_cidade(cidade_id):
     """
     Obtém estatísticas dos dados de uma cidade
@@ -83,7 +114,12 @@ def obter_estatisticas_cidade(cidade_id):
         
         dados_cidade = repo_dados.buscar_por_cidade(cidade_id)
         
-        if not dados_cidade:
+        if not dados_cidade or len(dados_cidade) == 0:
+            return None
+        
+        # Verificar se dados_cidade é uma lista válida
+        if not isinstance(dados_cidade, list):
+            st.error("Erro: Dados retornados não estão no formato esperado")
             return None
         
         # Buscar informações das fontes
@@ -105,10 +141,34 @@ def obter_estatisticas_cidade(cidade_id):
             dados_por_fonte[fonte_nome] += 1
             
             if dado.data_hora:
-                datas_min_max.append(dado.data_hora)
+                try:
+                    # Normalizar datetime para evitar problemas de timezone
+                    data_normalizada = dado.data_hora
+                    
+                    # Verificar se é datetime válido
+                    if not isinstance(data_normalizada, datetime):
+                        # Tentar converter se for string
+                        if isinstance(data_normalizada, str):
+                            data_normalizada = datetime.fromisoformat(data_normalizada.replace('T', ' ').replace('Z', ''))
+                        else:
+                            continue  # Pular este registro se não conseguir processar
+                    
+                    # Se tem timezone, converter para naive (UTC)
+                    if data_normalizada.tzinfo is not None:
+                        data_normalizada = data_normalizada.replace(tzinfo=None)
+                    
+                    datas_min_max.append(data_normalizada)
+                except Exception as e_date:
+                    # Log erro específico da data e continuar
+                    print(f"Erro ao processar data {dado.data_hora}: {e_date}")
+                    continue
             
             if dado.altura_captura:
-                alturas_unicas.add(dado.altura_captura)
+                try:
+                    altura_val = float(dado.altura_captura)
+                    alturas_unicas.add(altura_val)
+                except (ValueError, TypeError):
+                    pass  # Ignorar alturas inválidas
         
         data_inicio = min(datas_min_max) if datas_min_max else None
         data_fim = max(datas_min_max) if datas_min_max else None
@@ -122,7 +182,12 @@ def obter_estatisticas_cidade(cidade_id):
         }
         
     except Exception as e:
+        # Log mais detalhado do erro para debug
+        error_details = traceback.format_exc()
         st.error(f"Erro ao obter estatísticas: {str(e)}")
+        # Para debug, mostrar detalhes do erro (remover em produção)
+        with st.expander("Detalhes do erro (debug)"):
+            st.code(error_details)
         return None
 
 
@@ -133,7 +198,7 @@ def excluir_dados_periodo(cidade_id, data_inicio, data_fim, altura_especifica=No
     try:
         repo_dados = MeteorologicalDataRepository()
         
-        # Converter datas para datetime
+        # Converter datas para datetime naive (sem timezone)
         data_inicio_dt = datetime.combine(data_inicio, datetime.min.time())
         data_fim_dt = datetime.combine(data_fim, datetime.max.time())
         
@@ -246,6 +311,13 @@ def delete_meteorological_data():
     
     if not estatisticas:
         st.warning(f"📭 Nenhum dado meteorológico encontrado para {cidade_nome}.")
+        
+        # Botão de debug para investigar o problema
+        if st.button("🔍 Debug - Investigar dados"):
+            debug_info = debug_dados_cidade(cidade_id)
+            with st.expander("Informações de Debug"):
+                st.text(debug_info)
+        
         return
     
     # Exibir estatísticas
@@ -370,8 +442,10 @@ def delete_meteorological_data():
         
         # Campo de confirmação por texto
         texto_confirmacao = st.text_input(
-            f'Digite "{cidade_nome}" para confirmar a exclusão completa:',
-            help="Digite exatamente o nome da cidade para confirmar"
+            label=f'Digite "{cidade_nome}" para confirmar a exclusão completa:',
+            help="Digite exatamente o nome da cidade para confirmar",
+            value=f'{cidade_nome}',
+            icon="✍️"
         )
         
         confirmacao_texto = texto_confirmacao.strip() == cidade_nome

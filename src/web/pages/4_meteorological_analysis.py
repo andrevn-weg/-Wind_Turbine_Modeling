@@ -113,8 +113,8 @@ def render_cidade_selector(cidades, regioes, paises):
     
     # Seletor de cidade
     st.markdown("""
-    <div class='section-header-minor'>
-        <h4>🏙️ Selecione a Cidade para Análise</h4>
+    <div class='wind-info-card slide-in'>
+        <h4 class="wind-info-title">🏙️ Selecione a Cidade para Análise</h4>
     </div>
     """, unsafe_allow_html=True)
     
@@ -148,6 +148,17 @@ def main():
     # Carregar dados básicos
     try:
         cidades = cidade_repo.listar_todos()
+        # Filtrar cidades que possuem dados meteorológicos
+        cidades_com_dados = []
+        try:
+            # Verificar se há dados meteorológicos para cada cidade
+            for c in cidades:
+                dados = met_repo.buscar_por_cidade(cidade_id=c.id, limite=1)
+                if dados and len(dados) > 0:
+                    cidades_com_dados.append(c)
+            cidades = cidades_com_dados      
+        except Exception as e:
+            st.error(f"Erro ao carregar dados meteorológicos das cidades: {e}")
         regioes = {r.id: r.nome for r in regiao_repo.listar_todos()}
         paises = {p.id: p.codigo for p in pais_repo.listar_todos()}
     except Exception as e:

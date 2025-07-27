@@ -66,7 +66,7 @@ def formatar_cidade_display(cidade, regiao_nome, pais_codigo):
     return f"{cidade.nome}{regiao_display} - {pais_codigo} - lat: {cidade.latitude:.4f} - lon: {cidade.longitude:.4f}"
 
 
-def processar_coleta_dados(api_client, latitude, longitude, data_inicio, data_fim, alturas_selecionadas, fonte_id, cidade_id, repo):
+def processar_coleta_dados(api_client, latitude, longitude, data_inicio, data_fim, alturas_selecionadas, fonte_id, cidade_id, repo, incluir_temperatura=True, incluir_umidade=True):
     """
     Processa a coleta de dados da API e salva no banco
     """
@@ -89,12 +89,23 @@ def processar_coleta_dados(api_client, latitude, longitude, data_inicio, data_fi
         # Fazer uma única chamada da API com todas as alturas necessárias
         st.info(f"🔄 Coletando dados para alturas: {', '.join([f'{h}m' for h in alturas_para_coletar])}...")
         
+        # Informar sobre parâmetros sendo coletados
+        parametros_info = ["velocidade do vento"]
+        if incluir_temperatura:
+            parametros_info.append("temperatura (2m)")
+        if incluir_umidade:
+            parametros_info.append("umidade relativa (2m)")
+        
+        st.info(f"📊 Parâmetros: {', '.join(parametros_info)}")
+        
         dados_api = api_client.obter_dados_historicos_vento(
             latitude=latitude,
             longitude=longitude,
             data_inicio=data_inicio,
             data_fim=data_fim,
-            alturas=alturas_para_coletar  # Todas as alturas em uma única chamada
+            alturas=alturas_para_coletar,  # Todas as alturas em uma única chamada
+            incluir_temperatura=incluir_temperatura,
+            incluir_umidade=incluir_umidade
         )
         
         if not dados_api or 'dados' not in dados_api:
@@ -472,6 +483,52 @@ def create_meteorological_data():
                 </div>
                 """, unsafe_allow_html=True)
 
+        # Seção 2: Opções de dados meteorológicos
+        st.markdown("---")
+        st.markdown("""
+        <div class='section-header-minor'>
+            <h4>📡 Parâmetros Meteorológicos a Coletar</h4>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Avisos informativos sobre alturas
+        st.markdown("""
+        <div class="info-box" style="background: #e3f2fd; padding: 15px; border-radius: 8px; border-left: 4px solid #2196f3; margin: 15px 0;">
+            <h4 style="color: #1976d2; margin-top: 0;">📏 Informação sobre Alturas dos Dados</h4>
+            <ul style="margin-bottom: 0; color: #424242;">
+                <li><strong>Velocidade do vento:</strong> obtida nas alturas selecionadas acima</li>
+                <li><strong>Temperatura:</strong> sempre obtida a <strong>2 metros</strong> de altura</li>
+                <li><strong>Umidade relativa:</strong> sempre obtida a <strong>2 metros</strong> de altura</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div class="warning-box" style="background: #fff3e0; padding: 15px; border-radius: 8px; border-left: 4px solid #ff9800; margin: 15px 0;">
+            <h4 style="color: #ef6c00; margin-top: 0;">⚠️ Disponibilidade dos Dados</h4>
+            <ul style="margin-bottom: 0; color: #424242;">
+                <li>Se algum parâmetro não estiver disponível na API, será desconsiderado automaticamente</li>
+                <li>Isso não interrompe a coleta dos demais parâmetros</li>
+                <li>O sistema informa quais dados foram obtidos com sucesso</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Opções de parâmetros
+        col_param1, col_param2, col_param3 = st.columns(3)
+        
+        with col_param1:
+            st.markdown("**🌪️ Velocidade do Vento**")
+            incluir_vento = st.checkbox("Incluir dados de vento", value=True, disabled=True, help="Velocidade do vento é sempre incluída")
+        
+        with col_param2:
+            st.markdown("**🌡️ Temperatura (2m)**")
+            incluir_temperatura = st.checkbox("Incluir dados de temperatura", value=True, help="Temperatura do ar a 2 metros de altura")
+        
+        with col_param3:
+            st.markdown("**💧 Umidade Relativa (2m)**")
+            incluir_umidade = st.checkbox("Incluir dados de umidade", value=True, help="Umidade relativa do ar a 2 metros de altura")
+
         # Seção 3: Botões de ação
         st.markdown("---")
         st.markdown("""
@@ -547,7 +604,9 @@ def create_meteorological_data():
                     alturas_selecionadas=dados['alturas'],
                     fonte_id=dados['fonte_obj'].id,
                     cidade_id=cidade_selecionada.id,
-                    repo=met_repo
+                    repo=met_repo,
+                    incluir_temperatura=incluir_temperatura,
+                    incluir_umidade=incluir_umidade
                 )
                 
                 total_dados_salvos += dados_salvos
