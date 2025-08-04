@@ -1,0 +1,458 @@
+"""
+Página de Simulação de Turbina Eólica
+
+Esta página implementa a simulação completa de turbinas eólicas:
+- Configuração de parâmetros da turbina
+- Simulação de performance e potência
+- Análise temporal e estatística
+- Relatórios de eficiência
+"""
+
+import streamlit as st
+import sys
+from pathlib import Path
+import pandas as pd
+import numpy as np
+
+# Adicionar src ao path para imports
+src_path = Path(__file__).parent.parent.parent.parent / "src"
+sys.path.insert(0, str(src_path))
+
+from analysis_tools.turbine_performance import TurbinePerformanceCalculator
+from analysis_tools.visualization import AnalysisVisualizer
+from analysis_tools.wind_components import WindComponentsSimulator
+from meteorological.meteorological_data.repository import MeteorologicalDataRepository
+
+
+def safe_get_city_name(cidade_obj):
+    """Extrai nome da cidade de forma segura."""
+    if isinstance(cidade_obj, dict):
+        if 'cidade' in cidade_obj and hasattr(cidade_obj['cidade'], 'nome'):
+            return cidade_obj['cidade'].nome
+        elif 'cidade' in cidade_obj and isinstance(cidade_obj['cidade'], dict):
+            return cidade_obj['cidade'].get('nome', 'N/A')
+        elif 'nome' in cidade_obj:
+            return cidade_obj['nome']
+    elif hasattr(cidade_obj, 'nome'):
+        return cidade_obj.nome
+    return 'cidade'
+
+
+def render_turbine_simulation_tab():
+    """Renderiza a aba de simulação de turbina."""
+    
+    st.markdown("""
+    <div class="wind-info-card slide-in">
+        <h4 class="wind-info-title">⚡ Simulação de Turbina Eólica</h4>
+        <p>Simulação completa de performance e eficiência da turbina</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Verificar se dados anteriores estão disponíveis
+    if not st.session_state.analysis_state.get('cidade_selected'):
+        st.warning("⚠️ Configure os parâmetros iniciais primeiro.")
+        return
+    
+    if not st.session_state.analysis_state.get('wind_components_data'):
+        st.warning("⚠️ Execute a análise de componentes do vento primeiro.")
+        return
+        
+    cidade_selected = st.session_state.analysis_state['cidade_selected']
+    cidade_nome = safe_get_city_name(cidade_selected)
+    wind_components_data = st.session_state.analysis_state['wind_components_data']
+    components = wind_components_data['components']
+    
+    # Seção 1: Configuração da Turbina
+    st.markdown("### ⚙️ Configuração da Turbina")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        turbine_model = st.selectbox(
+            "Modelo da Turbina:",
+            [
+                "Vestas V80-2MW",
+                "Enercon E-70",
+                "Gamesa G90-2MW",
+                "GE 1.5MW",
+                "Personalizada"
+            ],
+            help="Selecione um modelo pré-definido ou configure manualmente"
+        )
+        
+        rotor_diameter = st.number_input(
+            "Diâmetro do Rotor (m):",
+            min_value=30.0,
+            max_value=200.0,
+            value=80.0,
+            step=5.0
+        )
+    
+    with col2:
+        rated_power = st.number_input(
+            "Potência Nominal (kW):",
+            min_value=500,
+            max_value=10000,
+            value=2000,
+            step=100
+        )
+        
+        hub_height = st.number_input(
+            "Altura do Hub (m):",
+            min_value=40.0,
+            max_value=150.0,
+            value=80.0,
+            step=5.0
+        )
+    
+    with col3:
+        cut_in_speed = st.number_input(
+            "Velocidade de Partida (m/s):",
+            min_value=2.0,
+            max_value=5.0,
+            value=3.0,
+            step=0.1
+        )
+        
+        cut_out_speed = st.number_input(
+            "Velocidade de Parada (m/s):",
+            min_value=20.0,
+            max_value=30.0,
+            value=25.0,
+            step=0.5
+        )
+        
+        rated_speed = st.number_input(
+            "Velocidade Nominal (m/s):",
+            min_value=10.0,
+            max_value=16.0,
+            value=12.0,
+            step=0.5
+        )
+    
+    # Seção 2: Parâmetros de Análise
+    st.markdown("---")
+    st.markdown("### 🔧 Parâmetros de Análise")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        tipo_analise = st.selectbox(
+            "Tipo de Análise:",
+            ["estatistica", "temporal", "completa"],
+            index=2,
+            help="Estatística: apenas curva de potência\nTemporal: simulação temporal\nCompleta: ambos"
+        )
+        
+    with col2:
+        cp_model = st.selectbox(
+            "Modelo de Cp:",
+            ["heier", "standard"],
+            help="Modelo matemático para coeficiente de potência"
+        )
+        
+    with col3:
+        beta_angle = st.slider(
+            "Ângulo de Pitch β (°):",
+            min_value=0.0,
+            max_value=15.0,
+            value=0.0,
+            step=0.5,
+            help="Ângulo de controle das pás"
+        )
+    
+    # Botão de simulação
+    st.markdown("---")
+    
+    if st.button("🚀 Executar Simulação da Turbina", type="primary", use_container_width=True):
+        
+        with st.spinner("Executando simulação da turbina..."):
+            try:
+                calculator = TurbinePerformanceCalculator()
+                
+                # Especificações da turbina
+                turbine_specs = {
+                    'model': turbine_model,
+                    'rotor_diameter': rotor_diameter,
+                    'rated_power': rated_power,
+                    'hub_height': hub_height,
+                    'cut_in_speed': cut_in_speed,
+                    'cut_out_speed': cut_out_speed,
+                    'rated_speed': rated_speed
+                }
+                
+                # Parâmetros de análise
+                analysis_params = {
+                    'cp_model': cp_model,
+                    'beta': beta_angle,
+                    'analysis_type': tipo_analise
+                }
+                
+                # Executar simulação temporal
+                if tipo_analise in ['temporal', 'completa']:
+                    performance_data = calculator.simulate_temporal_performance(
+                        turbine_specs=turbine_specs,
+                        wind_data=components.air_flow,
+                        time_vector=components.time,
+                        beta=analysis_params.get('beta', 0.0),
+                        model=analysis_params.get('cp_model', 'heier')
+                    )
+                else:
+                    performance_data = None
+                
+                # Calcular curva de potência
+                power_curve_performance = calculator.generate_power_curve(
+                    turbine_specs=turbine_specs,
+                    beta=analysis_params.get('beta', 0.0)
+                )
+                
+                # Análise de coeficiente de potência
+                if tipo_analise in ['estatistica', 'completa']:
+                    cp_analysis = calculator.analyze_performance(power_curve_performance)
+                else:
+                    cp_analysis = None
+                
+                # Calcular estatísticas operacionais
+                operational_stats = calculator.calculate_operational_statistics(
+                    performance_data if tipo_analise in ['temporal', 'completa'] else None,
+                    power_curve_performance,
+                    components.air_flow
+                )
+                
+                # Salvar resultados
+                st.session_state.analysis_state['turbine_simulation_data'] = {
+                    'performance_data': performance_data if tipo_analise in ['temporal', 'completa'] else None,
+                    'power_curve': power_curve_performance,
+                    'cp_analysis': cp_analysis if tipo_analise in ['estatistica', 'completa'] else None,
+                    'operational_stats': operational_stats,
+                    'turbine_specs': turbine_specs,
+                    'analysis_params': analysis_params,
+                    'tipo_analise': tipo_analise
+                }
+                
+                st.success("✅ Simulação da turbina concluída!")
+                
+            except Exception as e:
+                st.error(f"❌ Erro na simulação: {str(e)}")
+                import traceback
+                st.code(traceback.format_exc())
+                return
+    
+    # Exibir resultados se disponíveis
+    simulation_data = st.session_state.analysis_state.get('turbine_simulation_data')
+    
+    if simulation_data:
+        performance_data = simulation_data['performance_data']
+        power_curve = simulation_data['power_curve']
+        cp_analysis = simulation_data['cp_analysis']
+        operational_stats = simulation_data['operational_stats']
+        turbine_specs = simulation_data['turbine_specs']
+        
+        st.markdown("---")
+        st.markdown("### 📊 Resultados da Simulação")
+        
+        # Visualizações principais
+        visualizer = AnalysisVisualizer()
+        
+        # 1. Curva de Potência
+        st.markdown("#### ⚡ Curva de Potência da Turbina")
+        
+        fig_power = visualizer.plot_turbine_power_curve(
+            performance=power_curve,
+            height=600
+        )
+        st.plotly_chart(fig_power, use_container_width=True)
+        
+        # 2. Análise do Coeficiente de Potência (se disponível)
+        if cp_analysis:
+            st.markdown("#### 🔄 Análise do Coeficiente de Potência (Cp)")
+            
+            fig_cp = visualizer.plot_cp_curve(
+                performance=power_curve,
+                height=600
+            )
+            st.plotly_chart(fig_cp, use_container_width=True)
+        
+        # 3. Performance Temporal (se disponível)
+        if performance_data:
+            st.markdown("#### ⏱️ Performance Temporal")
+            
+            fig_temporal = visualizer.plot_temporal_performance(
+                performance_data=performance_data,
+                wind_data=components.air_flow,
+                height=800
+            )
+            st.plotly_chart(fig_temporal, use_container_width=True)
+        
+        # Métricas principais
+        st.markdown("### 📈 Métricas de Performance")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric(
+                "Potência Média",
+                f"{operational_stats.get('operational_stats', {}).get('avg_power', 0):.1f} kW",
+                delta=f"{operational_stats.get('efficiency_stats', {}).get('capacity_factor', 0):.1f}% CF"
+            )
+        
+        with col2:
+            st.metric(
+                "Energia Produzida",
+                f"{operational_stats.get('operational_stats', {}).get('energy_production', 0):.0f} kWh",
+                delta="Produção contínua"
+            )
+        
+        with col3:
+            st.metric(
+                "Horas Operação",
+                f"{operational_stats.get('operational_stats', {}).get('operating_hours', 0):.0f} h",
+                delta=f"{operational_stats.get('operational_stats', {}).get('availability', 0):.1f}% disponível"
+            )
+        
+        with col4:
+            st.metric(
+                "Eficiência Média",
+                f"{operational_stats.get('efficiency_stats', {}).get('avg_cp', 0)*100:.1f}%",
+                delta=f"Cp médio: {operational_stats.get('efficiency_stats', {}).get('avg_cp', 0):.3f}"
+            )
+        
+        # Análise detalhada
+        st.markdown("### 📋 Análise Detalhada")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**Estatísticas de Performance**")
+            
+            # Estatísticas básicas
+            stats_data = []
+            
+            # Dados de potência
+            if 'power_stats' in operational_stats:
+                power_stats = operational_stats['power_stats']
+                for key, value in power_stats.items():
+                    stats_data.append({
+                        'Métrica': key.replace('_', ' ').title(),
+                        'Valor': f"{value:.2f}" if isinstance(value, float) else str(value),
+                        'Unidade': 'kW' if 'power' in key else 'm/s' if 'speed' in key else '-'
+                    })
+            
+            # Dados operacionais
+            if 'operational_stats' in operational_stats:
+                op_stats = operational_stats['operational_stats']
+                for key, value in op_stats.items():
+                    stats_data.append({
+                        'Métrica': key.replace('_', ' ').title(),
+                        'Valor': f"{value:.2f}" if isinstance(value, float) else str(value),
+                        'Unidade': 'h' if 'hours' in key else '%' if 'availability' in key else 'kW' if 'power' in key else 'kWh' if 'energy' in key else '-'
+                    })
+            
+            if stats_data:
+                df_stats = pd.DataFrame(stats_data)
+                st.dataframe(df_stats, use_container_width=True)
+        
+        with col2:
+            st.markdown("**Especificações da Turbina**")
+            
+            specs_data = []
+            for key, value in turbine_specs.items():
+                specs_data.append({
+                    'Parâmetro': key.replace('_', ' ').title(),
+                    'Valor': f"{value:.1f}" if isinstance(value, float) else str(value),
+                    'Unidade': get_unit_for_param(key)
+                })
+            
+            df_specs = pd.DataFrame(specs_data)
+            st.dataframe(df_specs, use_container_width=True)
+        
+        # Tabelas de dados
+        st.markdown("### 📄 Dados Tabulares")
+        
+        tab1, tab2, tab3 = st.tabs(["💫 Curva de Potência", "⏱️ Performance Temporal", "📊 Estatísticas"])
+        
+        with tab1:
+            if hasattr(power_curve, 'wind_speeds') and hasattr(power_curve, 'power_output'):
+                df_power = pd.DataFrame({
+                    'Velocidade do Vento (m/s)': power_curve.wind_speeds,
+                    'Potência (kW)': power_curve.power_output,
+                    'Cp': power_curve.cp_values if hasattr(power_curve, 'cp_values') else np.zeros_like(power_curve.wind_speeds),
+                    'Lambda': power_curve.lambda_values if hasattr(power_curve, 'lambda_values') else np.zeros_like(power_curve.wind_speeds)
+                })
+                st.dataframe(df_power, use_container_width=True)
+        
+        with tab2:
+            if performance_data:
+                df_temporal = pd.DataFrame({
+                    'Tempo (h)': performance_data['time'],
+                    'Velocidade Vento (m/s)': performance_data['wind_speeds'],
+                    'Potência (kW)': performance_data['power_output'],
+                    'Cp': performance_data['cp_values'],
+                    'Status': performance_data['operational_status']
+                })
+                st.dataframe(df_temporal, use_container_width=True)
+        
+        with tab3:
+            # Resumo geral das estatísticas
+            summary_data = []
+            
+            if performance_data and 'metrics' in performance_data:
+                metrics = performance_data['metrics']
+                for key, value in metrics.items():
+                    summary_data.append({
+                        'Métrica': key.replace('_', ' ').title(),
+                        'Valor': f"{value:.2f}" if isinstance(value, float) else str(value),
+                        'Descrição': get_metric_description(key)
+                    })
+            
+            if summary_data:
+                df_summary = pd.DataFrame(summary_data)
+                st.dataframe(df_summary, use_container_width=True)
+        
+        # Recomendações
+        st.markdown("### 💡 Recomendações")
+        
+        if performance_data and 'metrics' in performance_data:
+            capacity_factor = performance_data['metrics'].get('capacity_factor', 0)
+            avg_cp = performance_data['metrics'].get('avg_cp', 0)
+            
+            if capacity_factor > 40:
+                st.success(f"✅ **Excelente fator de capacidade** ({capacity_factor:.1f}%). Local muito favorável para geração eólica.")
+            elif capacity_factor > 25:
+                st.info(f"ℹ️ **Bom fator de capacidade** ({capacity_factor:.1f}%). Local adequado para geração eólica.")
+            else:
+                st.warning(f"⚠️ **Fator de capacidade baixo** ({capacity_factor:.1f}%). Considere outros locais ou turbinas maiores.")
+            
+            if avg_cp > 0.4:
+                st.success(f"✅ **Excelente eficiência aerodinâmica** (Cp = {avg_cp:.3f}). Turbina bem otimizada.")
+            elif avg_cp > 0.3:
+                st.info(f"ℹ️ **Boa eficiência aerodinâmica** (Cp = {avg_cp:.3f}). Performance adequada.")
+            else:
+                st.warning(f"⚠️ **Baixa eficiência aerodinâmica** (Cp = {avg_cp:.3f}). Considere ajustar parâmetros.")
+
+
+def get_unit_for_param(param_key):
+    """Retorna a unidade apropriada para cada parâmetro."""
+    units = {
+        'rotor_diameter': 'm',
+        'rated_power': 'kW',
+        'hub_height': 'm',
+        'cut_in_speed': 'm/s',
+        'cut_out_speed': 'm/s',
+        'rated_speed': 'm/s',
+        'beta': '°'
+    }
+    return units.get(param_key, '-')
+
+
+def get_metric_description(metric_key):
+    """Retorna descrição para cada métrica."""
+    descriptions = {
+        'total_energy': 'Energia total produzida no período',
+        'capacity_factor': 'Percentual da potência nominal utilizada',
+        'avg_wind_speed': 'Velocidade média do vento',
+        'avg_cp': 'Coeficiente de potência médio',
+        'max_power': 'Potência máxima atingida',
+        'operating_hours': 'Percentual de tempo em operação'
+    }
+    return descriptions.get(metric_key, 'Métrica de performance')

@@ -473,3 +473,59 @@ class MeteorologicalDataRepository:
             umidade=row[7],
             created_at=created_at_obj
         )
+    
+    def get_unique_cities_with_data(self) -> List[Dict]:
+        """
+        Busca todas as cidades que possuem dados meteorológicos com contagem.
+        
+        Returns:
+            List[Dict]: Lista de dicionários com cidade_id e dados_count
+        """
+        try:
+            self._conectar()
+            query = '''
+            SELECT cidade_id, COUNT(*) as dados_count 
+            FROM meteorological_data 
+            GROUP BY cidade_id 
+            ORDER BY dados_count DESC
+            '''
+            self.cursor.execute(query)
+            resultados = self.cursor.fetchall()
+            
+            return [{'cidade_id': row[0], 'dados_count': row[1]} for row in resultados]
+        finally:
+            self._desconectar()
+    
+    def get_date_range_for_city(self, cidade_id: int) -> Optional[Dict]:
+        """
+        Busca o período disponível de dados para uma cidade específica.
+        
+        Args:
+            cidade_id: ID da cidade
+            
+        Returns:
+            Dict: Dicionário com data_inicio, data_fim e total_registros
+        """
+        try:
+            self._conectar()
+            query = '''
+            SELECT 
+                MIN(data_hora) as data_inicio,
+                MAX(data_hora) as data_fim,
+                COUNT(*) as total_registros
+            FROM meteorological_data 
+            WHERE cidade_id = ?
+            '''
+            self.cursor.execute(query, (cidade_id,))
+            resultado = self.cursor.fetchone()
+            
+            if resultado and resultado[0] and resultado[1]:
+                return {
+                    'data_inicio': resultado[0],
+                    'data_fim': resultado[1],
+                    'total_registros': resultado[2]
+                }
+            
+            return None
+        finally:
+            self._desconectar()

@@ -1,0 +1,49 @@
+2025-08-03 20:34:43,972 - ERROR - Erro em Configuração das Páginas: AttributeError - 'StreamlitPage' object has no attribute 'page'
+2025-08-03 20:34:43,974 - ERROR - Traceback: Traceback (most recent call last):
+  File "C:\Users\Andre_Vinicius\Documents\GitHub\-Wind_Turbine_Modeling\main.py", line 132, in <module>
+    page_path = Path(page.page)
+                     ^^^^^^^^^
+AttributeError: 'StreamlitPage' object has no attribute 'page'. Did you mean: '_page'?
+
+2025-08-03 20:34:59,499 - ERROR - Erro em Configuração das Páginas: AttributeError - 'StreamlitPage' object has no attribute 'page'
+2025-08-03 20:34:59,500 - ERROR - Traceback: Traceback (most recent call last):
+  File "C:\Users\Andre_Vinicius\Documents\GitHub\-Wind_Turbine_Modeling\main.py", line 132, in <module>
+    page_path = Path(page.page)
+                     ^^^^^^^^^
+AttributeError: 'StreamlitPage' object has no attribute 'page'. Did you mean: '_page'?
+
+2025-08-03 20:38:09,379 - ERROR - Erro em Configuração das Páginas: AttributeError - 'StreamlitPage' object has no attribute 'page'
+2025-08-03 20:38:09,380 - ERROR - Traceback: Traceback (most recent call last):
+  File "C:\Users\Andre_Vinicius\Documents\GitHub\-Wind_Turbine_Modeling\main.py", line 132, in <module>
+    page_path = Path(page.page)
+                     ^^^^^^^^^
+AttributeError: 'StreamlitPage' object has no attribute 'page'. Did you mean: '_page'?
+
+2025-08-03 20:38:26,116 - ERROR - Erro em Configuração das Páginas: AttributeError - 'StreamlitPage' object has no attribute 'page'
+2025-08-03 20:38:26,117 - ERROR - Traceback: Traceback (most recent call last):
+  File "C:\Users\Andre_Vinicius\Documents\GitHub\-Wind_Turbine_Modeling\main.py", line 132, in <module>
+    page_path = Path(page.page)
+                     ^^^^^^^^^
+AttributeError: 'StreamlitPage' object has no attribute 'page'. Did you mean: '_page'?
+
+2025-08-03 20:38:39,072 - ERROR - Erro em Configuração das Páginas: AttributeError - 'StreamlitPage' object has no attribute 'page'
+2025-08-03 20:38:39,073 - ERROR - Traceback: Traceback (most recent call last):
+  File "C:\Users\Andre_Vinicius\Documents\GitHub\-Wind_Turbine_Modeling\main.py", line 132, in <module>
+    page_path = Path(page.page)
+                     ^^^^^^^^^
+AttributeError: 'StreamlitPage' object has no attribute 'page'. Did you mean: '_page'?
+
+2025-08-03 20:38:49,228 - ERROR - Erro em Configuração das Páginas: AttributeError - 'StreamlitPage' object has no attribute 'page'
+2025-08-03 20:38:49,229 - ERROR - Traceback: Traceback (most recent call last):
+  File "C:\Users\Andre_Vinicius\Documents\GitHub\-Wind_Turbine_Modeling\main.py", line 132, in <module>
+    page_path = Path(page.page)
+                     ^^^^^^^^^
+AttributeError: 'StreamlitPage' object has no attribute 'page'. Did you mean: '_page'?
+
+2025-08-03 20:39:09,418 - ERROR - Erro em Configuração das Páginas: AttributeError - 'StreamlitPage' object has no attribute 'page'
+2025-08-03 20:39:09,419 - ERROR - Traceback: Traceback (most recent call last):
+  File "C:\Users\Andre_Vinicius\Documents\GitHub\-Wind_Turbine_Modeling\main.py", line 132, in <module>
+    page_path = Path(page.page)
+                     ^^^^^^^^^
+AttributeError: 'StreamlitPage' object has no attribute 'page'. Did you mean: '_page'?
+

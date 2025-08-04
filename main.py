@@ -41,6 +41,13 @@ pages = {
         st.Page(page="src/web/pages/4_meteorological_analysis.py", title="Análises Meteorológicas", icon="📊"),
         # st.Page(page="src/web/pages/6_comparacao_fontes.py", title="Comparação de Fontes", icon="🔍"),
     ],
+    "⚙️ Turbinas": [
+        st.Page(page="src/web/pages/5_turbine_parameters.py", title="Parâmetros das Turbinas", icon="⚙️"),
+        st.Page(page="src/web/pages/6_aerogenerators.py", title="Aerogeradores", icon="🏭"),
+    ],
+    "🔬 Análise": [
+        st.Page(page="src/web/pages/7_analysis.py", title="Análise de Turbinas Eólicas", icon="🔬"),
+    ],
     
 }
 
