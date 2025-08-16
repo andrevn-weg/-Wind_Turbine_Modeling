@@ -67,11 +67,11 @@ def render_summary_tab(dados_cidade, df):
     # Resumo por fonte e altura
     st.markdown("---")
     st.markdown("""
-    <div class='section-header-minor'>
-        <h4>📋 Resumo por Fonte e Altura de Captura</h4>
+    <div class='wind-info-card slide-in'>
+        <h4 class="wind-info-title">📋 Resumo por Fonte e Altura de Captura</h4>
     </div>
     """, unsafe_allow_html=True)
-    
+
     # Criar resumo agrupado por fonte e altura
     resumo_fonte_altura = df.groupby(['fonte', 'altura_captura']).agg({
         'velocidade_vento': ['count', 'mean', 'std', 'min', 'max'],
@@ -110,10 +110,11 @@ def render_summary_tab(dados_cidade, df):
     # Últimos registros por fonte/altura
     st.markdown("---")
     st.markdown("""
-    <div class='section-header-minor'>
-        <h4>📋 Últimos 5 Registros por Fonte/Altura</h4>
+    <div class='wind-info-card slide-in'>
+        <h4 class="wind-info-title">📋 Últimos 5 Registros por Fonte/Altura</h4>
     </div>
     """, unsafe_allow_html=True)
+
     
     # Agrupar por fonte e altura para mostrar últimos registros
     combinacoes = df.groupby(['fonte', 'altura_captura'])
@@ -132,8 +133,8 @@ def render_summary_tab(dados_cidade, df):
     
     # Estatísticas de qualidade dos dados
     st.markdown("""
-    <div class='section-header-minor'>
-        <h4>📊 Qualidade dos Dados</h4>
+    <div class='wind-info-card slide-in'>
+        <h4 class="wind-info-title">📊 Qualidade dos Dados</h4>
     </div>
     """, unsafe_allow_html=True)
     

@@ -345,30 +345,49 @@ def render_results_reports_tab():
 
             with col1:
                 st.markdown("**Perfil de Vento:**")
-                profile_params = wind_profile_data['parameters']
-                st.write(f"- Altura referência: {profile_params['altura_referencia']:.0f} m")
-                st.write(f"- Altura turbina: {profile_params['altura_turbina']:.0f} m")
-                st.write(f"- Tipo terreno: {profile_params['tipo_terreno']}")
-                st.write(f"- Expoente α: {profile_params['expoente_alpha']:.3f}")
-                st.write(f"- Rugosidade z₀: {profile_params['rugosidade_z0']:.4f}")
+                profile_params = wind_profile_data.get('parameters', {})
+                try:
+                    # Corrigir chaves dos parâmetros
+                    altura_ref = profile_params.get('h_ref', profile_params.get('altura_referencia', 10))
+                    altura_turb = profile_params.get('altura_turbina', altura_turbina)
+                    tipo_terreno = profile_params.get('terrain_type', profile_params.get('tipo_terreno', 'N/A'))
+                    expoente = profile_params.get('n_coeff', profile_params.get('expoente_alpha', 0.143))
+                    rugosidade = profile_params.get('z0', profile_params.get('rugosidade_z0', 0.03))
+                    
+                    st.write(f"- Altura referência: {altura_ref:.0f} m")
+                    st.write(f"- Altura turbina: {altura_turb:.0f} m")
+                    st.write(f"- Tipo terreno: {tipo_terreno}")
+                    st.write(f"- Expoente α: {expoente:.3f}")
+                    st.write(f"- Rugosidade z₀: {rugosidade:.4f}")
+                except Exception as e:
+                    st.error(f"Erro ao carregar parâmetros do perfil: {e}")
+                    st.write("- Dados não disponíveis")
 
             with col2:
                 st.markdown("**Componentes do Vento:**")
-                comp_params = wind_components_data['parameters']
-                st.write(f"- Duração: {comp_params['duracao']:.0f} h")
-                st.write(f"- Pontos: {comp_params['pontos']}")
-                st.write(f"- Velocidade base: {comp_params['velocidade_base']:.2f} m/s")
-                st.write(f"- Método turbulência: {comp_params['metodo_turbulencia']}")
-                st.write(f"- Método combinação: {comp_params['metodo_combinacao']}")
+                try:
+                    comp_params = wind_components_data.get('parameters', {})
+                    st.write(f"- Duração: {comp_params.get('duracao', 24):.0f} h")
+                    st.write(f"- Pontos: {comp_params.get('pontos', 1000)}")
+                    st.write(f"- Velocidade base: {comp_params.get('velocidade_base', 8.0):.2f} m/s")
+                    st.write(f"- Método turbulência: {comp_params.get('metodo_turbulencia', 'N/A')}")
+                    st.write(f"- Método combinação: {comp_params.get('metodo_combinacao', 'N/A')}")
+                except Exception as e:
+                    st.error(f"Erro ao carregar parâmetros dos componentes: {e}")
+                    st.write("- Dados não disponíveis")
 
             with col3:
                 st.markdown("**Simulação Turbina:**")
-                turb_specs = turbine_simulation_data['turbine_specs']
-                analysis_params = turbine_simulation_data['analysis_params']
-                st.write(f"- Densidade ar: {analysis_params['air_density']:.3f} kg/m³")
-                st.write(f"- Eficiência sistema: {turb_specs['system_efficiency']*100:.0f}%")
-                st.write(f"- Perdas operacionais: {turb_specs['operational_losses']*100:.0f}%")
-                st.write(f"- Método Cp: {analysis_params['cp_method']}")
+                try:
+                    turb_specs = turbine_simulation_data.get('turbine_specs', {})
+                    analysis_params = turbine_simulation_data.get('analysis_params', {})
+                    st.write(f"- Densidade ar: {analysis_params.get('air_density', 1.225):.3f} kg/m³")
+                    st.write(f"- Eficiência sistema: {turb_specs.get('system_efficiency', 0.9)*100:.0f}%")
+                    st.write(f"- Perdas operacionais: {turb_specs.get('operational_losses', 0.1)*100:.0f}%")
+                    st.write(f"- Método Cp: {analysis_params.get('cp_method', 'N/A')}")
+                except Exception as e:
+                    st.error(f"Erro ao carregar parâmetros da turbina: {e}")
+                    st.write("- Dados não disponíveis")
     
     except Exception as e:
         st.error(f"Erro ao carregar dados de entrada: {e}")
@@ -455,16 +474,44 @@ def render_results_reports_tab():
         with tab3:
             st.markdown("### Performance Operacional da Turbina")
 
+            # Verificar se dados estão disponíveis
+            if not turbine_simulation_data.get('power_curve'):
+                st.warning("⚠️ Dados da curva de potência não disponíveis")
+                return
+
             # Curva de potência com dados reais
             st.markdown("#### Curva de Potência vs Dados Reais")
 
-            power_curve = turbine_simulation_data['power_curve']
-            fig_power_real = visualizer.plot_power_curve_with_real_data(
-                power_curve=power_curve,
-                real_wind_speeds=components.air_flow,
-                height=600
-            )
-            st.plotly_chart(fig_power_real, use_container_width=True)
+            try:
+                power_curve = turbine_simulation_data['power_curve']
+                
+                # Verificar se power_curve é objeto ou dicionário
+                if hasattr(power_curve, 'wind_speeds'):
+                    # É um objeto TurbinePerformance
+                    wind_speeds_curve = power_curve.wind_speeds
+                    power_outputs_curve = power_curve.power_output  # Corrigido: singular, não plural
+                else:
+                    # É um dicionário
+                    wind_speeds_curve = power_curve.get('wind_speeds', [])
+                    power_outputs_curve = power_curve.get('power_output', power_curve.get('power_outputs', []))  # Tentar ambos
+                
+                # Verificar se os dados estão disponíveis (tratamento para arrays numpy)
+                has_wind_speeds = (hasattr(wind_speeds_curve, '__len__') and len(wind_speeds_curve) > 0) or bool(wind_speeds_curve)
+                has_power_outputs = (hasattr(power_outputs_curve, '__len__') and len(power_outputs_curve) > 0) or bool(power_outputs_curve)
+                
+                if has_wind_speeds and has_power_outputs:
+                    fig_power_real = visualizer.plot_power_curve_with_real_data(
+                        power_curve=power_curve,
+                        real_wind_speeds=components.air_flow,
+                        height=600
+                    )
+                    st.plotly_chart(fig_power_real, use_container_width=True)
+                else:
+                    st.warning("⚠️ Dados da curva de potência incompletos")
+                    
+            except Exception as e:
+                st.error(f"Erro ao gerar gráfico da curva de potência: {e}")
+                st.write("Dados da curva de potência não estão no formato esperado")
 
             # Indicadores de performance
             st.markdown("#### Indicadores de Performance")
@@ -559,10 +606,17 @@ def render_results_reports_tab():
                 with col2:
                     st.markdown("**Tempo em Diferentes Modos:**")
 
-                    # Classificar operação
-                    cut_in = turbina_selected.velocidade_corte_inicial
-                    cut_out = turbina_selected.velocidade_corte_final
-                    rated_speed = 12  # Estimativa típica
+                    # Classificar operação com valores seguros
+                    try:
+                        cut_in = getattr(turbina_selected, 'cut_in_speed', None) or \
+                               getattr(turbina_selected, 'velocidade_corte_inicial', 3.0)
+                        cut_out = getattr(turbina_selected, 'cut_out_speed', None) or \
+                                getattr(turbina_selected, 'velocidade_corte_final', 25.0)
+                        rated_speed = getattr(turbina_selected, 'rated_wind_speed', 12.0)  # Velocidade nominal
+                    except:
+                        cut_in = 3.0
+                        cut_out = 25.0
+                        rated_speed = 12.0
 
                     parado = np.sum(components.air_flow < cut_in) / len(components.air_flow) * 100
                     operacao_parcial = np.sum((components.air_flow >= cut_in) & (components.air_flow < rated_speed)) / len(components.air_flow) * 100
@@ -619,37 +673,56 @@ def render_results_reports_tab():
                 ) / 100
 
             # Cálculos econômicos
-            potencia_kw = turbina_selected.potencia_nominal / 1000
-            investimento_total = potencia_kw * custo_investimento
-            energia_anual_kwh = operational_stats.get('operational_stats', {}).get('energy_production', 0)
-            energia_anual_mwh = energia_anual_kwh / 1000  # Converter para MWh
-            receita_anual = energia_anual_mwh * preco_energia
+            try:
+                # Obter potência nominal de forma segura
+                potencia_nominal = getattr(turbina_selected, 'potencia_nominal', None) or \
+                                 getattr(turbina_selected, 'rated_power', None) or \
+                                 getattr(turbina_selected, 'rated_power_kw', 1000)
+                
+                potencia_kw = float(potencia_nominal) / 1000 if potencia_nominal > 100 else float(potencia_nominal)
+                
+                investimento_total = potencia_kw * custo_investimento
+                energia_anual_kwh = operational_stats.get('operational_stats', {}).get('energy_production', 0)
+                energia_anual_mwh = energia_anual_kwh / 1000  # Converter para MWh
+                receita_anual = energia_anual_mwh * preco_energia
 
-            # Custos operacionais
-            custo_om_percent = 0.03  # 3% do investimento
-            custo_om_anual = investimento_total * custo_om_percent
+                # Custos operacionais
+                custo_om_percent = 0.03  # 3% do investimento
+                custo_om_anual = investimento_total * custo_om_percent
 
-            # Seguros e outros
-            outros_custos = investimento_total * 0.01  # 1% do investimento
+                # Seguros e outros
+                outros_custos = investimento_total * 0.01  # 1% do investimento
 
-            receita_liquida_anual = receita_anual - custo_om_anual - outros_custos
+                receita_liquida_anual = receita_anual - custo_om_anual - outros_custos
 
-            # VPL e TIR (simplificado)
-            vida_util = 20
-            fluxos = [-investimento_total] + [receita_liquida_anual] * vida_util
+                # VPL e TIR (simplificado)
+                vida_util = 20
+                fluxos = [-investimento_total] + [receita_liquida_anual] * vida_util
 
-            # VPL
-            vpls = []
-            for i, fluxo in enumerate(fluxos):
-                if i == 0:
-                    vpls.append(fluxo)
+                # VPL
+                vpls = []
+                for i, fluxo in enumerate(fluxos):
+                    if i == 0:
+                        vpls.append(fluxo)
+                    else:
+                        vpls.append(fluxo / ((1 + taxa_desconto) ** i))
+
+                vpl = sum(vpls)
+
+                # Payback simples
+                if receita_liquida_anual > 0:
+                    payback = investimento_total / receita_liquida_anual
                 else:
-                    vpls.append(fluxo / ((1 + taxa_desconto) ** i))
-
-            vpl = sum(vpls)
-
-            # Payback simples
-            payback = investimento_total / receita_liquida_anual
+                    payback = float('inf')
+                    
+            except Exception as e:
+                st.error(f"Erro nos cálculos econômicos: {e}")
+                # Valores padrão para evitar erros
+                potencia_kw = 1000
+                investimento_total = 5000000
+                vpl = 0
+                payback = float('inf')
+                receita_anual = 0
 
             # Resultados econômicos
             st.markdown("#### Indicadores Econômicos")
@@ -762,25 +835,29 @@ def render_results_reports_tab():
     with col3:
         if st.button("🔧 Parâmetros de Configuração", use_container_width=True):
             # JSON com todos os parâmetros
-            config_data = {
-                'projeto': {
-                    'cidade': nome_cidade,
-                    'turbina': turbina_selected.modelo,
-                    'altura_turbina': altura_turbina,
-                    'data_analise': datetime.now().isoformat()
-                },
-                'parametros_perfil_vento': wind_profile_data['parameters'],
-                'parametros_componentes': wind_components_data['parameters'],
-                'parametros_turbina': turbine_simulation_data['analysis_params'],
-                'resultados_resumo': {
-                    'fator_capacidade': operational_stats.get('efficiency_stats', {}).get('capacity_factor', 0),
-                    'energia_anual': operational_stats.get('operational_stats', {}).get('energy_production', 0),
-                    'velocidade_media': float(velocidade_media),
-                    'potencia_media': operational_stats.get('operational_stats', {}).get('avg_power', 0)
+            try:
+                config_data = {
+                    'projeto': {
+                        'cidade': nome_cidade,
+                        'turbina': modelo_turbina,
+                        'altura_turbina': altura_turbina,
+                        'data_analise': datetime.now().isoformat()
+                    },
+                    'parametros_perfil_vento': wind_profile_data.get('parameters', {}),
+                    'parametros_componentes': wind_components_data.get('parameters', {}),
+                    'parametros_turbina': turbine_simulation_data.get('analysis_params', {}),
+                    'resultados_resumo': {
+                        'fator_capacidade': operational_stats.get('efficiency_stats', {}).get('capacity_factor', 0),
+                        'energia_anual': operational_stats.get('operational_stats', {}).get('energy_production', 0),
+                        'velocidade_media': float(velocidade_media),
+                        'potencia_media': operational_stats.get('operational_stats', {}).get('avg_power', 0)
+                    }
                 }
-            }
-            
-            config_json = json.dumps(config_data, indent=2, ensure_ascii=False)
+                
+                config_json = json.dumps(config_data, indent=2, ensure_ascii=False, default=str)
+            except Exception as e:
+                st.error(f"Erro ao gerar configuração: {e}")
+                config_json = '{"erro": "Não foi possível gerar configuração"}'
             
             st.download_button(
                 label="💾 Download Configuração",
@@ -793,32 +870,62 @@ def render_results_reports_tab():
     st.markdown("---")
     st.markdown("## 💡 Recomendações Finais")
     
-    gerar_recomendacoes_finais(operational_stats, velocidade_media, cf, vpl, payback)
+    # Garantir que vpl e payback estão definidos (valores padrão se não calculados)
+    try:
+        # Se as variáveis foram definidas na aba 4, usar os valores calculados
+        vpl_final = vpl if 'vpl' in locals() else 0
+        payback_final = payback if 'payback' in locals() else float('inf')
+    except:
+        vpl_final = 0
+        payback_final = float('inf')
+    
+    gerar_recomendacoes_finais(operational_stats, velocidade_media, cf, vpl_final, payback_final)
 
 
 def gerar_relatorio_executivo(cidade, turbina, altura, stats, vel_media, cf):
     """Gera relatório executivo em texto."""
     
+    try:
+        # Obter dados da cidade de forma segura
+        nome_cidade = getattr(cidade, 'nome', None) or cidade.get('nome', 'N/A') if hasattr(cidade, 'get') else getattr(cidade, 'nome', 'N/A')
+        estado_cidade = getattr(cidade, 'estado', None) or cidade.get('estado', 'N/A') if hasattr(cidade, 'get') else getattr(cidade, 'estado', 'N/A')
+        lat_cidade = getattr(cidade, 'latitude', None) or cidade.get('latitude', 0) if hasattr(cidade, 'get') else getattr(cidade, 'latitude', 0)
+        lon_cidade = getattr(cidade, 'longitude', None) or cidade.get('longitude', 0) if hasattr(cidade, 'get') else getattr(cidade, 'longitude', 0)
+        
+        # Obter dados da turbina de forma segura
+        fabricante_turbina = getattr(turbina, 'fabricante', None) or getattr(turbina, 'marca_fabricante', 'N/A')
+        modelo_turbina = getattr(turbina, 'modelo', 'N/A')
+        potencia_turbina = getattr(turbina, 'potencia_nominal', None) or getattr(turbina, 'rated_power', 1000)
+        
+    except Exception as e:
+        # Valores padrão em caso de erro
+        nome_cidade = 'N/A'
+        estado_cidade = 'N/A'
+        lat_cidade = 0
+        lon_cidade = 0
+        fabricante_turbina = 'N/A'
+        modelo_turbina = 'N/A'
+        potencia_turbina = 1000
+        
     relatorio = f"""
 RELATÓRIO EXECUTIVO - ANÁLISE DE VIABILIDADE EÓLICA
 ================================================
 
 DADOS DO PROJETO
 ----------------
-Localização: {cidade.nome}, {cidade.estado}
-Coordenadas: {cidade.latitude}°, {cidade.longitude}°
-Turbina: {turbina.fabricante} {turbina.modelo}
-Potência Nominal: {turbina.potencia_nominal/1000:.1f} kW
+Localização: {nome_cidade}, {estado_cidade}
+Coordenadas: {lat_cidade}°, {lon_cidade}°
+Turbina: {fabricante_turbina} {modelo_turbina}
+Potência Nominal: {float(potencia_turbina)/1000:.1f} kW
 Altura da Torre: {altura:.0f} m
 Data da Análise: {datetime.now().strftime('%d/%m/%Y %H:%M')}
 
 RESULTADOS PRINCIPAIS
 --------------------
 Fator de Capacidade: {cf*100:.1f}%
-Energia Anual: {stats['annual_energy']:.0f} MWh
+Energia Anual: {stats.get('operational_stats', {}).get('energy_production', 0):.0f} kWh
 Velocidade Média do Vento: {vel_media:.2f} m/s
-Potência Média: {stats['average_power']:.1f} kW
-Rendimento Energético: {stats['energy_yield']:.0f} kWh/m²
+Potência Média: {stats.get('operational_stats', {}).get('avg_power', 0):.1f} kW
 
 CLASSIFICAÇÃO DO RECURSO
 -----------------------
@@ -836,10 +943,8 @@ CLASSIFICAÇÃO DO RECURSO
     relatorio += f"""
 INDICADORES OPERACIONAIS
 -----------------------
-Disponibilidade: {stats['availability']*100:.1f}%
-Horas de Operação/Ano: {stats['operating_hours']:.0f} h
-Eficiência Média: {stats['average_efficiency']*100:.1f}%
-Coeficiente de Potência Médio: {stats['average_cp']:.3f}
+Disponibilidade: {stats.get('operational_stats', {}).get('availability', 95):.1f}%
+Eficiência Média: {stats.get('efficiency_stats', {}).get('avg_cp', 0.35)*100:.1f}%
 
 CONCLUSÃO
 ---------
@@ -899,10 +1004,12 @@ def gerar_recomendacoes_finais(stats, vel_media, cf, vpl, payback):
         st.success("✅ **Excelente performance:** Projeto altamente viável")
     
     # Recomendações operacionais
-    if stats['availability'] < 0.90:
+    availability = stats.get('operational_stats', {}).get('availability', 0.95)
+    if availability < 0.90:
         st.warning("⚠️ **Baixa disponibilidade:** Revisar estratégias de manutenção")
     
-    if stats['average_efficiency'] < 0.30:
+    avg_efficiency = stats.get('efficiency_stats', {}).get('avg_cp', 0.35)
+    if avg_efficiency < 0.30:
         st.warning("⚠️ **Baixa eficiência:** Otimizar controle e operação")
     
     st.markdown("### 💰 Recomendações Econômicas")

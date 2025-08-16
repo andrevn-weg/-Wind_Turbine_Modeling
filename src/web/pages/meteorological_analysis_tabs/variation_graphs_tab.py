@@ -23,8 +23,8 @@ def render_variation_graphs_tab(df):
         return
     
     st.markdown("""
-    <div class='section-header-minor'>
-        <h4>📈 Variação dos Dados Meteorológicos ao Longo do Tempo</h4>
+    <div class='wind-info-card slide-in'>
+        <h4 class="wind-info-title">📈 Variação dos Dados Meteorológicos ao Longo do Tempo</h4>
         <p>Dados separados por fonte e altura de captura para análise precisa.</p>
     </div>
     """, unsafe_allow_html=True)
@@ -34,8 +34,11 @@ def render_variation_graphs_tab(df):
     
     # Gráfico de Velocidade do Vento
     if 'velocidade_vento' in df.columns and df['velocidade_vento'].notna().any():
-        st.subheader("🌪️ Velocidade do Vento por Fonte e Altura")
-        
+        st.markdown("""
+            <div class='wind-info-card slide-in'>
+                <h4 class="wind-info-title">🌪️ Velocidade do Vento por Fonte e Altura</h4>
+            </div>
+            """, unsafe_allow_html=True)
         fig_vento = px.line(
             df, 
             x='data_hora', 
@@ -68,7 +71,11 @@ def render_variation_graphs_tab(df):
     
     with col1:
         if 'temperatura' in df.columns and df['temperatura'].notna().any():
-            st.subheader("🌡️ Temperatura por Fonte e Altura")
+            st.markdown("""
+                <div class='wind-info-card slide-in'>
+                    <h4 class="wind-info-title">🌡️ Temperatura por Fonte e Altura</h4>
+                </div>
+                """, unsafe_allow_html=True)
             
             df_temp = df.dropna(subset=['temperatura'])
             if not df_temp.empty:
@@ -91,8 +98,11 @@ def render_variation_graphs_tab(df):
     
     with col2:
         if 'umidade' in df.columns and df['umidade'].notna().any():
-            st.subheader("💧 Umidade por Fonte e Altura")
-            
+            st.markdown("""
+                <div class='wind-info-card slide-in'>
+                    <h4 class="wind-info-title">💧 Umidade por Fonte e Altura</h4>
+                </div>
+                """, unsafe_allow_html=True)
             df_umidade = df.dropna(subset=['umidade'])
             if not df_umidade.empty:
                 fig_umidade = px.line(
@@ -117,7 +127,11 @@ def render_variation_graphs_tab(df):
         'velocidade_vento' in df.columns and df['velocidade_vento'].notna().any()):
         
         st.markdown("---")
-        st.subheader("🔗 Correlação: Velocidade do Vento vs Temperatura")
+        st.markdown("""
+            <div class='wind-info-card slide-in'>
+                <h4 class="wind-info-title">🔗 Correlação: Velocidade do Vento vs Temperatura</h4>
+            </div>
+            """, unsafe_allow_html=True)
         
         df_correlacao = df.dropna(subset=['temperatura', 'velocidade_vento'])
         
@@ -142,7 +156,12 @@ def render_variation_graphs_tab(df):
     # Análise por período do dia (se temos dados suficientes)
     if len(df) > 24:  # Pelo menos 24 registros para análise por hora
         st.markdown("---")
-        st.subheader("🕐 Análise por Período do Dia")
+        st.subheader("")
+        st.markdown("""
+            <div class='wind-info-card slide-in'>
+                <h4 class="wind-info-title">🕐 Análise por Período do Dia</h4>
+            </div>
+            """, unsafe_allow_html=True)
         
         # Extrair hora do dia
         df_periodo = df.copy()

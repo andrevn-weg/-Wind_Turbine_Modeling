@@ -29,7 +29,7 @@ load_css(str(css_path))
 
 # Configuração das páginas
 pages = {
-    "🏠 Principal": [
+    "": [
         st.Page(page="src/web/pages/0_home.py", title="Home", icon="🍃"),
     ],
     "📊 Localidades": [

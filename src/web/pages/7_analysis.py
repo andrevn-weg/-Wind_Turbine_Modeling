@@ -185,7 +185,8 @@ def verificar_prerequisites():
         # Verificar dados meteorológicos
         from meteorological.meteorological_data.repository import MeteorologicalDataRepository
         met_repo = MeteorologicalDataRepository()
-        total_dados = len(met_repo.listar_todos())
+        dados_meteorologicos = met_repo.listar_todos(limite=1)  # Buscar apenas 1 para verificar se existe
+        total_dados = len(dados_meteorologicos)
         
         # Verificar turbinas cadastradas
         from turbine_parameters.aerogenerators.repository import AerogeneratorRepository
@@ -195,7 +196,8 @@ def verificar_prerequisites():
         # Verificar cidades
         from geographic.cidade.repository import CidadeRepository
         cidade_repo = CidadeRepository()
-        total_cidades = cidade_repo.contar_total()
+        cidades = cidade_repo.listar_todos()  # Usar listar_todos() em vez de contar_total()
+        total_cidades = len(cidades)
         
         # Mostrar alertas se necessário
         warnings = []
@@ -224,12 +226,18 @@ def verificar_prerequisites():
             st.sidebar.success(f"""
             ✅ **Sistema Pronto**
             - {total_cidades} cidades
-            - {total_dados} dados meteorológicos  
+            - {total_dados}+ dados meteorológicos  
             - {total_turbinas} turbinas
             """)
     
     except Exception as e:
         st.sidebar.error(f"Erro ao verificar pré-requisitos: {str(e)}")
+        # Adicionar informações de debug
+        st.sidebar.warning("⚠️ Sistema funcionando em modo limitado")
+        with st.sidebar.expander("🔧 Debug Info"):
+            st.write(f"Erro detalhado: {e}")
+            import traceback
+            st.code(traceback.format_exc(), language="python")
 
 
 def render_analysis_status_footer():

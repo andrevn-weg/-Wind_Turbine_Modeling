@@ -692,13 +692,13 @@ class AnalysisVisualizer:
         
         return fig
     
-    def plot_power_curve_with_real_data(self, power_curve: Dict, real_wind_speeds: np.ndarray, 
+    def plot_power_curve_with_real_data(self, power_curve, real_wind_speeds: np.ndarray, 
                                        height: int = 600) -> go.Figure:
         """
         Sobrepõe a curva de potência teórica com dados reais de vento.
         
         Args:
-            power_curve: Dados da curva de potência
+            power_curve: Dados da curva de potência (Dict ou objeto TurbinePerformance)
             real_wind_speeds: Velocidades reais do vento
             height: Altura do gráfico
             
@@ -707,10 +707,20 @@ class AnalysisVisualizer:
         """
         fig = go.Figure()
         
+        # Extrair dados da curva de potência (objeto ou dicionário)
+        if hasattr(power_curve, 'wind_speeds'):
+            # É um objeto TurbinePerformance
+            wind_speeds = power_curve.wind_speeds
+            power_output = power_curve.power_output
+        else:
+            # É um dicionário
+            wind_speeds = power_curve.get('wind_speeds', [])
+            power_output = power_curve.get('power_output', power_curve.get('power_outputs', []))
+        
         # Curva de potência teórica
         fig.add_trace(go.Scatter(
-            x=power_curve['wind_speeds'],
-            y=power_curve['power_output'],
+            x=wind_speeds,
+            y=power_output,
             mode='lines',
             name='Curva de Potência',
             line=dict(color=self.COLORS['power_curve'], width=3)
@@ -721,7 +731,7 @@ class AnalysisVisualizer:
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
         
         # Normalizar para escala de potência
-        hist_normalized = hist / np.max(hist) * np.max(power_curve['power_output']) * 0.3
+        hist_normalized = hist / np.max(hist) * np.max(power_output) * 0.3
         
         fig.add_trace(go.Scatter(
             x=bin_centers,

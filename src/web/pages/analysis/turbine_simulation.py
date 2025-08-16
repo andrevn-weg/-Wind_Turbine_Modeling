@@ -147,7 +147,7 @@ def render_turbine_simulation_tab():
     with col2:
         cp_model = st.selectbox(
             "Modelo de Cp:",
-            ["heier", "standard"],
+            ["heier", "default"],
             help="Modelo matemático para coeficiente de potência"
         )
         

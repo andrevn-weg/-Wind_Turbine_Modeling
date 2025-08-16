@@ -21,8 +21,16 @@ def main():
       # Título e subtítulo
     st.markdown("""
     <div class="page-main-header">
-        <h1>Simulador de <span style="color: rgb(219 123 52); text-shadow: 2px 2px 4px rgba(0,0,0,0.3); font-weight: bold;">Turbina Eólica</span></h1>
-        <p>Modelagem e Análise de Componentes de Turbinas Eólicas</p>
+        <h1>
+            <span style="color: #4CAF50; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); font-weight: bold;">
+                EolicSim
+            </span>
+            - Simulador de Potência Eólica
+        </h1>
+        <p>
+            Plataforma para análise, modelagem e simulação estatística da geração eólica, 
+            permitindo avaliar o desempenho de turbinas em diferentes condições de vento e cenários operacionais.
+        </p>
     </div>
     """, unsafe_allow_html=True)
     
