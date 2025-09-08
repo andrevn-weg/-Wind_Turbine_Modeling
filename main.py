@@ -32,21 +32,22 @@ pages = {
     "": [
         st.Page(page="src/web/pages/0_home.py", title="Home", icon="🍃"),
     ],
-    "📊 Localidades": [
+    "Localidades": [
         st.Page(page="src/web/pages/1_cadastro_localidade.py", title="Cadastro de Localidade", icon="📍"),
         st.Page(page="src/web/pages/2_listar_localidades.py", title="Listar Localidades", icon="📋"),
     ],
-    "🌤️ Dados Climáticos": [
-        st.Page(page="src/web/pages/3_meteorological_registration.py", title="Cadastro de Dados Climáticos", icon="🌦️"),
+    "Dados Climáticos": [
+        st.Page(page="src/web/pages/3_meteorological_registration.py", title="Cadastro de Dados Climáticos", icon="🌤️"),
         st.Page(page="src/web/pages/4_meteorological_analysis.py", title="Análises Meteorológicas", icon="📊"),
         # st.Page(page="src/web/pages/6_comparacao_fontes.py", title="Comparação de Fontes", icon="🔍"),
     ],
-    "⚙️ Turbinas": [
+    "Turbinas": [
         st.Page(page="src/web/pages/5_turbine_parameters.py", title="Parâmetros das Turbinas", icon="⚙️"),
         st.Page(page="src/web/pages/6_aerogenerators.py", title="Aerogeradores", icon="🏭"),
     ],
-    "🔬 Análise": [
+    "Análise": [
         st.Page(page="src/web/pages/7_analysis.py", title="Análise de Turbinas Eólicas", icon="🔬"),
+        st.Page(page="src/web/pages/8_analise_simplificada.py", title="Análise Simplificada", icon="⚡"),
     ],
     
 }

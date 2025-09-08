@@ -50,29 +50,63 @@
     margin-top: 10px;
 }
 
-/* Section header styles */
+/* Section header styles - Updated to wind-info-card pattern */
 .section-header {
-    background-color: #e6f2ff;
-    padding: 2px;
-    border-radius: 5px;
-    border-left: 5px solid #0066cc;
-    margin-bottom: 15px;
+    background: linear-gradient(145deg, #ffffff, #f0f2f5);
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    margin-bottom: 1rem;
+    animation: slideIn 0.6s ease-out;
 }
 
 /* Section header styles */
 .section-header-minor {
-    background-color: #e6f2ff;
-    padding: 2px;
-    border-radius: 5px;
-    border-left: 5px solid #0066cc;
-    margin-bottom: 5px;
+    background: linear-gradient(145deg, #ffffff, #f0f2f5);
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    margin-bottom: 1rem;
+    animation: slideIn 0.6s ease-out;
 }
 .section-header-minor h4 {
-    color: #0066cc;
+    color: #34495e;
+    font-weight: 600;
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 0.5rem;
+}
+
+/* Thermal section - Updated to wind-info-card pattern */
+.thermal-section {
+    background: linear-gradient(145deg, #ffffff, #f0f2f5);
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    margin-bottom: 1rem;
+    animation: slideIn 0.6s ease-out;
+}
+
+.thermal-section h4 {
+    color: #34495e;
+    font-weight: 600;
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 0.5rem;
 }
 
 .section-header h4 {
-    color: #0066cc;
+    color: #34495e;
+    font-weight: 600;
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 0.5rem;
 }
 
 /* Button styling */

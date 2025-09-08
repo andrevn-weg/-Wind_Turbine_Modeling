@@ -153,10 +153,10 @@ def render_wind_profile_tab():
     
     with col3:
         # Altura máxima de análise
-        altura_max_sugerida = max(altura_turbina + 50, 100)
+        altura_max_sugerida = float(max(altura_turbina + 50, 100))
         h_max = st.number_input(
             "Altura Máxima Análise (m):",
-            min_value=h_ref + 10,
+            min_value=float(h_ref + 10),
             max_value=300.0,
             value=altura_max_sugerida,
             step=10.0,
