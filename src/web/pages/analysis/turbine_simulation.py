@@ -22,6 +22,8 @@ from analysis_tools.turbine_performance import TurbinePerformanceCalculator
 from analysis_tools.visualization import AnalysisVisualizer
 from analysis_tools.wind_components import WindComponentsSimulator
 from meteorological.meteorological_data.repository import MeteorologicalDataRepository
+from turbine_parameters.aerogenerators.repository import AerogeneratorRepository
+from turbine_parameters.manufacturers.repository import ManufacturerRepository
 
 
 def safe_get_city_name(cidade_obj):
@@ -65,70 +67,193 @@ def render_turbine_simulation_tab():
     # Seção 1: Configuração da Turbina
     st.markdown("### ⚙️ Configuração da Turbina")
     
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        turbine_model = st.selectbox(
-            "Modelo da Turbina:",
-            [
-                "Vestas V80-2MW",
-                "Enercon E-70",
-                "Gamesa G90-2MW",
-                "GE 1.5MW",
-                "Personalizada"
-            ],
-            help="Selecione um modelo pré-definido ou configure manualmente"
-        )
+    try:
+        # Conectar ao banco de dados para obter turbinas reais
+        aerogenerator_repo = AerogeneratorRepository()
+        manufacturer_repo = ManufacturerRepository()
         
-        rotor_diameter = st.number_input(
-            "Diâmetro do Rotor (m):",
-            min_value=30.0,
-            max_value=200.0,
-            value=80.0,
-            step=5.0
-        )
-    
-    with col2:
-        rated_power = st.number_input(
-            "Potência Nominal (kW):",
-            min_value=500,
-            max_value=10000,
-            value=2000,
-            step=100
-        )
+        # Obter todos os aerogeradores
+        aerogeneradores = aerogenerator_repo.listar_todos()
+        fabricantes = manufacturer_repo.listar_todos()
         
-        hub_height = st.number_input(
-            "Altura do Hub (m):",
-            min_value=40.0,
-            max_value=150.0,
-            value=80.0,
-            step=5.0
-        )
-    
-    with col3:
-        cut_in_speed = st.number_input(
-            "Velocidade de Partida (m/s):",
-            min_value=2.0,
-            max_value=5.0,
-            value=3.0,
-            step=0.1
-        )
+        if not aerogeneradores:
+            st.error("❌ Nenhuma turbina encontrada no banco de dados.")
+            return
         
-        cut_out_speed = st.number_input(
-            "Velocidade de Parada (m/s):",
-            min_value=20.0,
-            max_value=30.0,
-            value=25.0,
-            step=0.5
-        )
+        # Criar mapeamento de fabricantes
+        fabricante_map = {fab.id: fab.name for fab in fabricantes}
         
-        rated_speed = st.number_input(
-            "Velocidade Nominal (m/s):",
-            min_value=10.0,
-            max_value=16.0,
-            value=12.0,
-            step=0.5
-        )
+        # Criar opções de seleção
+        opcoes_turbinas = []
+        turbina_map = {}
+        
+        for aerog in aerogeneradores:
+            fabricante_nome = fabricante_map.get(aerog.manufacturer_id, "Desconhecido")
+            nome_completo = f"{fabricante_nome} - {aerog.model} ({aerog.rated_power_kw}kW)"
+            opcoes_turbinas.append(nome_completo)
+            turbina_map[nome_completo] = aerog
+            
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            turbine_selected = st.selectbox(
+                "Modelo da Turbina:",
+                opcoes_turbinas,
+                help="Selecione uma turbina do banco de dados"
+            )
+            
+            # Obter turbina selecionada
+            turbina_obj = turbina_map[turbine_selected]
+            
+            # Validar e ajustar o valor do diâmetro do rotor
+            rotor_value = float(turbina_obj.rotor_diameter_m)
+            if rotor_value < 30.0:
+                # Se o valor do banco for muito pequeno, usar um valor padrão
+                rotor_value = max(rotor_value, 50.0)  # Mínimo seguro para turbinas comerciais
+                st.warning(f"⚠️ Diâmetro do rotor da turbina ({turbina_obj.rotor_diameter_m}m) ajustado para {rotor_value}m")
+            
+            rotor_diameter = st.number_input(
+                "Diâmetro do Rotor (m):",
+                min_value=15.0,  # Reduzido para acomodar turbinas menores
+                max_value=200.0,
+                value=rotor_value,
+                step=5.0,
+                help="Diâmetro do rotor da turbina selecionada"
+            )
+        
+        with col2:
+            # Validar e ajustar o valor da potência nominal
+            power_value = int(turbina_obj.rated_power_kw)
+            if power_value < 500:
+                power_value = 500
+                st.warning(f"⚠️ Potência da turbina ({turbina_obj.rated_power_kw}kW) ajustada para {power_value}kW")
+            
+            rated_power = st.number_input(
+                "Potência Nominal (kW):",
+                min_value=100,  # Reduzido para acomodar turbinas menores
+                max_value=10000,
+                value=power_value,
+                step=100,
+                help="Potência nominal da turbina selecionada"
+            )
+            
+            # Validar e ajustar o valor da altura do hub
+            hub_value = float(turbina_obj.hub_height_m)
+            if hub_value < 40.0:
+                hub_value = max(hub_value, 30.0)  # Mínimo para turbinas menores
+                st.warning(f"⚠️ Altura do hub da turbina ({turbina_obj.hub_height_m}m) ajustada para {hub_value}m")
+            
+            hub_height = st.number_input(
+                "Altura do Hub (m):",
+                min_value=20.0,  # Reduzido para acomodar turbinas menores
+                max_value=150.0,
+                value=hub_value,
+                step=5.0,
+                help="Altura do hub da turbina selecionada"
+            )
+        
+        with col3:
+            # Validar e ajustar velocidade de partida
+            cut_in_value = float(turbina_obj.cut_in_speed)
+            if cut_in_value < 2.0 or cut_in_value > 5.0:
+                cut_in_value = max(min(cut_in_value, 5.0), 2.0)
+                st.warning(f"⚠️ Velocidade de partida ({turbina_obj.cut_in_speed}m/s) ajustada para {cut_in_value}m/s")
+            
+            cut_in_speed = st.number_input(
+                "Velocidade de Partida (m/s):",
+                min_value=1.0,  # Mais flexível
+                max_value=8.0,   # Mais flexível
+                value=cut_in_value,
+                step=0.1,
+                help="Velocidade mínima para operação"
+            )
+            
+            # Validar e ajustar velocidade de parada
+            cut_out_value = float(turbina_obj.cut_out_speed)
+            if cut_out_value < 20.0:
+                cut_out_value = max(cut_out_value, 15.0)
+                st.warning(f"⚠️ Velocidade de parada ({turbina_obj.cut_out_speed}m/s) ajustada para {cut_out_value}m/s")
+            
+            cut_out_speed = st.number_input(
+                "Velocidade de Parada (m/s):",
+                min_value=15.0,  # Mais flexível
+                max_value=35.0,  # Mais flexível
+                value=cut_out_value,
+                step=0.5,
+                help="Velocidade máxima para operação"
+            )
+            
+            # Validar e ajustar velocidade nominal
+            rated_wind_value = float(turbina_obj.rated_wind_speed) if turbina_obj.rated_wind_speed else 12.0
+            if rated_wind_value < 10.0 or rated_wind_value > 16.0:
+                rated_wind_value = max(min(rated_wind_value, 16.0), 10.0)
+                if turbina_obj.rated_wind_speed:
+                    st.warning(f"⚠️ Velocidade nominal ({turbina_obj.rated_wind_speed}m/s) ajustada para {rated_wind_value}m/s")
+            
+            rated_speed = st.number_input(
+                "Velocidade Nominal (m/s):",
+                min_value=8.0,   # Mais flexível
+                max_value=18.0,  # Mais flexível
+                value=rated_wind_value,
+                step=0.5,
+                help="Velocidade para potência nominal"
+            )
+            
+    except Exception as e:
+        st.error(f"❌ Erro ao carregar dados de turbinas: {str(e)}")
+        st.warning("⚠️ Usando configuração manual como fallback")
+        
+        # Fallback para configuração manual com limites flexíveis
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            turbine_selected = "Manual"
+            rotor_diameter = st.number_input(
+                "Diâmetro do Rotor (m):", 
+                min_value=15.0, 
+                max_value=200.0, 
+                value=80.0, 
+                step=5.0
+            )
+        
+        with col2:
+            rated_power = st.number_input(
+                "Potência Nominal (kW):", 
+                min_value=100, 
+                max_value=10000, 
+                value=2000, 
+                step=100
+            )
+            hub_height = st.number_input(
+                "Altura do Hub (m):", 
+                min_value=20.0, 
+                max_value=150.0, 
+                value=80.0, 
+                step=5.0
+            )
+        
+        with col3:
+            cut_in_speed = st.number_input(
+                "Velocidade de Partida (m/s):", 
+                min_value=1.0, 
+                max_value=8.0, 
+                value=3.0, 
+                step=0.1
+            )
+            cut_out_speed = st.number_input(
+                "Velocidade de Parada (m/s):", 
+                min_value=15.0, 
+                max_value=35.0, 
+                value=25.0, 
+                step=0.5
+            )
+            rated_speed = st.number_input(
+                "Velocidade Nominal (m/s):", 
+                min_value=8.0, 
+                max_value=18.0, 
+                value=12.0, 
+                step=0.5
+            )
     
     # Seção 2: Parâmetros de Análise
     st.markdown("---")
@@ -172,7 +297,7 @@ def render_turbine_simulation_tab():
                 
                 # Especificações da turbina
                 turbine_specs = {
-                    'model': turbine_model,
+                    'model': turbine_selected,
                     'rotor_diameter': rotor_diameter,
                     'rated_power': rated_power,
                     'hub_height': hub_height,

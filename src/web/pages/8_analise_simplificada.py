@@ -912,7 +912,7 @@ def main():
     # Header
     st.markdown("""
     <div style="text-align: center; padding: 2rem; background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%); border-radius: 10px; margin-bottom: 2rem;">
-        <h1 style="color: white; margin: 0;">⚡ Análise Simplificada de Turbinas Eólicas</h1>
+        <h1 style="color: white; margin: 0;">⚡ Análise de Geração Eólicas</h1>
         <p style="color: #e8f4fd; margin: 0.5rem 0 0 0;">Previsão direta de geração de energia com dados reais do banco</p>
     </div>
     """, unsafe_allow_html=True)

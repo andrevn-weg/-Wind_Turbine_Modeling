@@ -46,8 +46,8 @@ pages = {
         st.Page(page="src/web/pages/6_aerogenerators.py", title="Aerogeradores", icon="🏭"),
     ],
     "Análise": [
-        st.Page(page="src/web/pages/7_analysis.py", title="Análise de Turbinas Eólicas", icon="🔬"),
-        st.Page(page="src/web/pages/8_analise_simplificada.py", title="Análise Simplificada", icon="⚡"),
+        # st.Page(page="src/web/pages/7_analysis.py", title="Análise de Turbinas Eólicas", icon="🔬"),
+        st.Page(page="src/web/pages/8_analise_simplificada.py", title="Análise de Geração Eólica", icon="⚡"),
     ],
     
 }

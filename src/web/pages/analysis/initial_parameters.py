@@ -290,12 +290,16 @@ def render_initial_parameters_tab():
                         - **Velocidade Cut-in:** {turbina_selecionada.cut_in_speed} m/s
                         - **Velocidade Cut-out:** {turbina_selecionada.cut_out_speed} m/s
                         """)
+                    else:
+                        turbina_selecionada = None
                         
                 else:
                     st.warning("⚠️ Nenhuma turbina encontrada para este fabricante.")
+                    turbina_selecionada = None
                     
         except Exception as e:
             st.error(f"❌ Erro ao buscar turbinas: {str(e)}")
+            turbina_selecionada = None
     
     with col4:
         st.markdown("### ⚡ Configurações de Instalação")
@@ -338,8 +342,12 @@ def render_initial_parameters_tab():
         if st.button("💾 Confirmar Parâmetros", type="primary", use_container_width=True):
             try:
                 # Verificar se todas as variáveis necessárias estão definidas
-                if 'cidade_selecionada' not in locals() or 'turbina_selecionada' not in locals():
-                    st.error("❌ Selecione cidade e turbina antes de confirmar.")
+                if 'cidade_selecionada' not in locals() or cidade_selecionada is None:
+                    st.error("❌ Selecione uma cidade antes de confirmar.")
+                    return
+                
+                if 'turbina_selecionada' not in locals() or turbina_selecionada is None:
+                    st.error("❌ Selecione uma turbina antes de confirmar.")
                     return
                 
                 if 'data_inicio' not in locals() or 'data_fim' not in locals() or 'dias_analise' not in locals():
