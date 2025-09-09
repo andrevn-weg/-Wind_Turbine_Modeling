@@ -1,3 +1,4 @@
 /lixo
 *.pyc
 /.cache
+/docs
