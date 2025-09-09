@@ -1,5 +1,5 @@
 # Dependências do Sistema de Simulação de Turbinas Eólicas
-# bibliotecas desatualizadas
+
 # Framework principal
 streamlit>=1.46.1
 
@@ -18,34 +18,32 @@ Pillow>=10.0.0
 # APIs e requisições
 requests>=2.31.0
 urllib3>=2.0.0
-
-# Para APIs meteorológicas
 httpx>=0.24.0
 
-# Open-Meteo API otimizada (dependências opcionais para melhor performance)
-# Instale estas dependências para obter cache e retry automático:
-# openmeteo-requests>=1.0.0     # Cliente oficial otimizado  
-# requests-cache>=1.0.0         # Cache automático de requisições
-# retry-requests>=2.0.0         # Retry automático em falhas
-
-# Banco de dados
-sqlite3  # Incluído no Python padrão
-
-# Utilitários de data/hora
+# Utilitários de data/hora e timezone
 python-dateutil>=2.8.0
+pytz>=2023.3
 
 # Análise científica (para modelagem de turbinas)
 scipy>=1.11.0
 
 # Processamento de coordenadas geográficas
 geopy>=2.3.0
+
+# Para downloads Excel e CSV
+openpyxl>=3.1.0
+
+# Testes e qualidade de código
 pytest>=7.4.0
 black>=23.7.0
 flake8>=6.0.0
 
-# Documentação
-mkdocs>=1.5.0
-mkdocs-material>=9.0.0
-
 # Para trabalhar com paths
 pathlib2>=2.3.7
+
+
+# Dependências opcionais para funcionalidades avançadas:
+openmeteo-requests>=1.0.0     # Cliente oficial otimizado
+requests-cache>=1.0.0         # Cache automático de requisições
+retry-requests>=2.0.0         # Retry automático em falhas
+# Nota: sqlite3, io, base64 são incluídos no Python padrão
