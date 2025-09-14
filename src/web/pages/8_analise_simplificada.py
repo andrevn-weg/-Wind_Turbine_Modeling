@@ -100,12 +100,12 @@ def calcular_velocidade_corrigida(velocidade_10m, altura_alvo, metodo, parametro
     
     if metodo == 'potencia':
         # Lei de Potência: v(h) = v_ref * (h/h_ref)^n
-        n = parametros.get('n', 0.2)  # Expoente típico para terreno aberto
+        n = parametros.get('n', 0.16)  # Expoente típico para pastagem
         return velocidade_10m * (altura_alvo / altura_ref) ** n
     
     elif metodo == 'logaritmica':
         # Lei Logarítmica: v(h) = v_ref * ln(h/z0) / ln(h_ref/z0)
-        z0 = parametros.get('z0', 0.1)  # Rugosidade típica para pastagem
+        z0 = parametros.get('z0', 0.05)  # Rugosidade típica para pastagem
         if altura_alvo <= z0 or altura_ref <= z0:
             return velocidade_10m  # Evitar divisão por zero ou log negativo
         return velocidade_10m * np.log(altura_alvo / z0) / np.log(altura_ref / z0)
@@ -1062,22 +1062,22 @@ def main():
             ["agua", "plano", "pastagem", "arvores", "floresta", "cidade"],
             index=2,  # pastagem como padrão
             format_func=lambda x: {
-                "agua": "Água/Lagos (n=0.10)",
-                "plano": "Terreno Plano (n=0.16)", 
-                "pastagem": "Pastagem (n=0.20)",
-                "arvores": "Árvores Esparsas (n=0.22)",
-                "floresta": "Floresta (n=0.28)",
-                "cidade": "Área Urbana (n=0.40)"
+                "agua": "Água/Lagos (n=0.11)",
+                "plano": "Terreno Plano (n=0.14)", 
+                "pastagem": "Pastagem (n=0.16)",
+                "arvores": "Árvores Esparsas (n=0.20)",
+                "floresta": "Floresta (n=0.25)",
+                "cidade": "Área Urbana (n=0.35)"
             }[x]
         )
         
         parametros_terreno = {
-            "agua": {"n": 0.10, "z0": 0.0002},
-            "plano": {"n": 0.16, "z0": 0.03},
-            "pastagem": {"n": 0.20, "z0": 0.10},
-            "arvores": {"n": 0.22, "z0": 0.25},
-            "floresta": {"n": 0.28, "z0": 1.00},
-            "cidade": {"n": 0.40, "z0": 2.00}
+            "agua": {"n": 0.11, "z0": 0.0002},     # Wikipedia: offshore wind farms
+            "plano": {"n": 0.143, "z0": 0.03},     # Wikipedia: neutral stability, open terrain
+            "pastagem": {"n": 0.16, "z0": 0.05},   # Literatura: pastagem/campo
+            "arvores": {"n": 0.20, "z0": 0.15},    # Wikipedia: cropland/brush
+            "floresta": {"n": 0.25, "z0": 0.7},    # Wikipedia: forest
+            "cidade": {"n": 0.35, "z0": 2.0}       # Wikipedia: urban dense
         }
         
         parametros = parametros_terreno[terreno_tipo]
@@ -1091,20 +1091,20 @@ def main():
             format_func=lambda x: {
                 "agua": "Água/Lagos (z0=0.0002m)",
                 "plano": "Terreno Plano (z0=0.03m)",
-                "pastagem": "Pastagem (z0=0.10m)",
-                "arvores": "Árvores Esparsas (z0=0.25m)",
-                "floresta": "Floresta (z0=1.00m)",
-                "cidade": "Área Urbana (z0=2.00m)"
+                "pastagem": "Pastagem (z0=0.05m)",
+                "arvores": "Árvores Esparsas (z0=0.15m)",
+                "floresta": "Floresta (z0=0.7m)",
+                "cidade": "Área Urbana (z0=2.0m)"
             }[x]
         )
         
         parametros_terreno = {
-            "agua": {"n": 0.10, "z0": 0.0002},
-            "plano": {"n": 0.16, "z0": 0.03},
-            "pastagem": {"n": 0.20, "z0": 0.10},
-            "arvores": {"n": 0.22, "z0": 0.25},
-            "floresta": {"n": 0.28, "z0": 1.00},
-            "cidade": {"n": 0.40, "z0": 2.00}
+            "agua": {"n": 0.11, "z0": 0.0002},     # Wikipedia: offshore wind farms
+            "plano": {"n": 0.143, "z0": 0.03},     # Wikipedia: neutral stability, open terrain
+            "pastagem": {"n": 0.16, "z0": 0.05},   # Literatura: pastagem/campo
+            "arvores": {"n": 0.20, "z0": 0.15},    # Wikipedia: cropland/brush
+            "floresta": {"n": 0.25, "z0": 0.7},    # Wikipedia: forest
+            "cidade": {"n": 0.35, "z0": 2.0}       # Wikipedia: urban dense
         }
         
         parametros = parametros_terreno[terreno_tipo]
