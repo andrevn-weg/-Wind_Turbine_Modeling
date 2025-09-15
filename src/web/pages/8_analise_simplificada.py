@@ -83,7 +83,7 @@ def criar_secao_download(dataframe, nome_base, titulo_secao):
         st.warning(f"⚠️ Nenhum dado disponível para download em {titulo_secao}")
 
 
-def calcular_velocidade_corrigida(velocidade_10m, altura_alvo, metodo, parametros):
+def calcular_velocidade_corrigida(velocidade_10m, altura_alvo, metodo, parametros, altura_ref = 10.0):
     """
     Calcula velocidade do vento na altura da turbina usando lei de potência ou logarítmica.
     
@@ -96,7 +96,7 @@ def calcular_velocidade_corrigida(velocidade_10m, altura_alvo, metodo, parametro
     Returns:
         Velocidade corrigida na altura da turbina
     """
-    altura_ref = 10.0  # Altura de referência dos dados meteorológicos
+    # altura_ref = 10.0  # Altura de referência dos dados meteorológicos
     
     if metodo == 'potencia':
         # Lei de Potência: v(h) = v_ref * (h/h_ref)^n
@@ -221,6 +221,190 @@ def exibir_resultados():
         st.error(f"❌ Erro ao carregar dados da análise: {str(e)}")
         return
     
+    # Seção de valores de referência das APIs por fonte e altura
+    st.markdown("""
+    <div class="wind-info-card slide-in">
+        <h4 class="wind-info-title">📍 Valores de Referência por Fonte e Altura</h4>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    try:
+        # Obter informações das fontes e dados originais
+        fontes_info = dados.get('fontes_info', [])
+        dados_originais = dados.get('dados_originais', [])
+        
+        if not dados_originais or not fontes_info:
+            st.warning("⚠️ Dados originais ou informações das fontes não disponíveis para análise detalhada.")
+        else:
+            # Criar mapeamento de fontes por ID
+            fonte_map = {fonte.id: fonte for fonte in fontes_info}
+            
+            # Agrupar dados por fonte e altura (chave única para cada combinação)
+            dados_por_fonte_altura = {}
+            for dado in dados_originais:
+                if dado.velocidade_vento is not None:
+                    fonte_id = dado.meteorological_data_source_id
+                    altura = float(dado.altura_captura) if dado.altura_captura else 10.0
+                    
+                    # Verificar se a fonte existe no mapeamento
+                    if fonte_id not in fonte_map:
+                        continue
+                    
+                    fonte_nome = fonte_map[fonte_id].name.replace('_', ' ').title()
+                    # Chave única: fonte + altura no formato "FONTE (altura)"
+                    chave = f"{fonte_nome} ({altura:.0f}m)"
+                    
+                    if chave not in dados_por_fonte_altura:
+                        dados_por_fonte_altura[chave] = {
+                            'fonte_id': fonte_id,
+                            'fonte_nome': fonte_nome,
+                            'altura': altura,
+                            'velocidades': [],
+                            'dados': [],
+                            'data_inicio': dado.data_hora,
+                            'data_fim': dado.data_hora
+                        }
+                    
+                    dados_por_fonte_altura[chave]['velocidades'].append(float(dado.velocidade_vento))
+                    dados_por_fonte_altura[chave]['dados'].append(dado)
+                    
+                    # Atualizar data de início e fim
+                    if dado.data_hora < dados_por_fonte_altura[chave]['data_inicio']:
+                        dados_por_fonte_altura[chave]['data_inicio'] = dado.data_hora
+                    if dado.data_hora > dados_por_fonte_altura[chave]['data_fim']:
+                        dados_por_fonte_altura[chave]['data_fim'] = dado.data_hora
+            
+            if not dados_por_fonte_altura:
+                st.warning("⚠️ Nenhum dado válido encontrado para análise.")
+            else:
+                # Calcular estatísticas para cada combinação fonte-altura
+                for chave, info in dados_por_fonte_altura.items():
+                    velocidades = info['velocidades']
+                    if velocidades:
+                        info['media'] = sum(velocidades) / len(velocidades)
+                        info['mediana'] = sorted(velocidades)[len(velocidades)//2]
+                        info['minima'] = min(velocidades)
+                        info['maxima'] = max(velocidades)
+                        info['registros'] = len(velocidades)
+                
+                # Organizar por fonte para criar seções
+                fontes_unicas = {}
+                for chave, info in dados_por_fonte_altura.items():
+                    fonte_nome = info['fonte_nome']
+                    if fonte_nome not in fontes_unicas:
+                        fontes_unicas[fonte_nome] = []
+                    fontes_unicas[fonte_nome].append((chave, info))
+                
+                # Ordenar alturas dentro de cada fonte
+                for fonte_nome in fontes_unicas:
+                    fontes_unicas[fonte_nome].sort(key=lambda x: x[1]['altura'])
+                
+                # Exibir dados organizados por fonte
+                for fonte_nome in sorted(fontes_unicas.keys()):
+                    st.markdown(f"### 🌍 {fonte_nome}")
+                    
+                    dados_fonte = fontes_unicas[fonte_nome]
+                    
+                    # Criar colunas para as alturas desta fonte
+                    num_colunas = min(len(dados_fonte), 4)  # Máximo 4 colunas
+                    if num_colunas > 0:
+                        colunas = st.columns(num_colunas)
+                        
+                        for i, (chave, info) in enumerate(dados_fonte):
+                            with colunas[i % num_colunas]:
+                                # Card para esta altura específica
+                                st.markdown(f"""
+                                <div style="border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 10px; background-color: #f8f9fa;">
+                                    <h6 style="margin: 0 0 8px 0; color: #2c3e50; text-align: center;">📏 {chave}</h6>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                
+                                # Organizar métricas em 5 colunas
+                                col_a, col_b, col_c, col_d, col_e = st.columns(5, border=True)
+                                
+                                with col_a:
+                                    st.metric(
+                                        label="🌬️ Velocidade Média",
+                                        value=f"{info['media']:.2f} m/s",
+                                        help=f"Velocidade média de {chave}"
+                                    )
+                                
+                                with col_b:
+                                    st.metric(
+                                        label="📊 Registros",
+                                        value=f"{info['registros']:,}",
+                                        help="Número total de registros válidos"
+                                    )
+                                
+                                with col_c:
+                                    st.metric(
+                                        label="📅 Período Inicial",
+                                        value=info['data_inicio'].strftime('%d/%m/%Y'),
+                                        help="Data do primeiro registro coletado"
+                                    )
+                                
+                                with col_d:
+                                    st.metric(
+                                        label="📅 Período Final",
+                                        value=info['data_fim'].strftime('%d/%m/%Y'),
+                                        help="Data do último registro coletado"
+                                    )
+                                
+                                with col_e:
+                                    # Velocidade corrigida na quinta coluna
+                                    try:
+                                        altura_turbina = parametros.get('altura', 80)
+                                        metodo = parametros.get('metodo', 'potencia')
+                                        parametros_terreno = parametros.get('parametros_terreno', {})
+                                        
+                                        velocidade_corrigida_media = calcular_velocidade_corrigida(
+                                            info['media'], 
+                                            altura_turbina, 
+                                            metodo, 
+                                            parametros_terreno,
+                                            altura_ref=info['altura']  # Usar a altura real dos dados como referência
+                                        )
+                                        
+                                        st.metric(
+                                            label=f"⚡ Corrigida ({altura_turbina:.0f}m)",
+                                            value=f"{velocidade_corrigida_media:.2f} m/s",
+                                            help=f"Velocidade corrigida de {info['altura']:.0f}m para {altura_turbina:.0f}m usando método {metodo}"
+                                        )
+                                    except Exception as corr_error:
+                                        st.caption(f"⚠️ Erro na correção: {str(corr_error)}")
+                                # Adicionar informações extras em um expander
+                                with st.expander("📈 Estatísticas Detalhadas"):
+                                    st.write(f"**Mediana:** {info['mediana']:.2f} m/s")
+                                    st.write(f"**Mínima:** {info['minima']:.2f} m/s")
+                                    st.write(f"**Máxima:** {info['maxima']:.2f} m/s")
+                                    st.write(f"**Amplitude:** {info['maxima'] - info['minima']:.2f} m/s")
+                                    st.write(f"**Fonte ID:** {info['fonte_id']}")
+                    
+                    # Separador entre fontes apenas se há múltiplas fontes
+                    if len(fontes_unicas) > 1:
+                        st.markdown("---")
+                
+                # Resumo geral
+                total_registros = sum([info['registros'] for info in dados_por_fonte_altura.values()])
+                total_fontes = len(fontes_unicas)
+                total_combinacoes = len(dados_por_fonte_altura)
+                
+                st.caption(f"💡 **Resumo Total:** {total_registros:,} registros de {total_fontes} fonte(s) em {total_combinacoes} combinação(ões) fonte-altura")
+        
+    except Exception as ref_error:
+        st.error(f"❌ Erro ao calcular valores de referência: {str(ref_error)}")
+        st.error(f"Detalhes: {ref_error}")
+        # Fallback para o método anterior
+        try:
+            velocidade_media_10m = df_resultados['velocidade_10m'].mean()
+            st.metric(
+                label="🎯 Velocidade Média Geral", 
+                value=f"{velocidade_media_10m:.2f} m/s",
+                help="Velocidade média do vento a 10m (todas as fontes)"
+            )
+        except:
+            st.warning("⚠️ Não foi possível calcular valores de referência")
+    
     # Estatísticas de geração
     st.markdown("""
     <div class="wind-info-card slide-in">
@@ -249,7 +433,7 @@ def exibir_resultados():
         estados_count = df_resultados['estado_operacional'].value_counts()
         total_registros = len(df_resultados)
         
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4 = st.columns(4, border=True)
         
         try:
             with col1:
@@ -417,7 +601,7 @@ def exibir_resultados():
             fig_hist = None
         
         # Exibir gráficos
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns(2, border=True)
         
         try:
             with col1:
@@ -513,7 +697,7 @@ def exibir_resultados():
             st.dataframe(df_mensal, use_container_width=True)
             
             # Gráfico de geração mensal
-            col1, col2 = st.columns(2)
+            col1, col2 = st.columns(2, border=True)
             
             with col1:
                 try:
@@ -602,7 +786,7 @@ def exibir_resultados():
                     use_container_width=True, hide_index=True)
         
         # Gráfico de geração por dia da semana
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns(2, border=True)
         
         with col1:
             try:
@@ -670,7 +854,7 @@ def exibir_resultados():
         # Calcular correlações
         corr_matrix = correlation_data.corr()
         
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns(2, border=True)
         
         with col1:
             try:
@@ -714,7 +898,7 @@ def exibir_resultados():
         # Estatísticas avançadas
         st.write("**📈 Estatísticas Detalhadas:**")
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3 = st.columns(3, border=True)
         
         with col1:
             st.write("**Potência (kW):**")
@@ -779,7 +963,7 @@ def exibir_resultados():
             df_horario = df_horario.reset_index()
             
             # Gráfico horário
-            col1, col2 = st.columns(2)
+            col1, col2 = st.columns(2, border=True)
             
             with col1:
                 try:
@@ -828,7 +1012,7 @@ def exibir_resultados():
     """, unsafe_allow_html=True)
     
     try:
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns(2, border=True)
         
         with col1:
             try:
@@ -843,7 +1027,7 @@ def exibir_resultados():
         with col2:
             try:
                 st.write("**Condições de Vento:**")
-                st.write(f"• Velocidade média (10m): {df_resultados['velocidade_10m'].mean():.1f} m/s")
+                st.write(f"• Velocidade média ({altura}m): {df_resultados['velocidade_10m'].mean():.1f} m/s")
                 st.write(f"• Velocidade média ({parametros['altura']}m): {velocidade_media:.1f} m/s")
                 st.write(f"• Fator de correção: {velocidade_media/df_resultados['velocidade_10m'].mean():.2f}")
                 st.write(f"• Método: {parametros['metodo'].title()}")
@@ -1112,7 +1296,7 @@ def main():
     
     altura_turbina = st.sidebar.number_input(
         "Altura da Turbina (m):",
-        min_value=20.0,
+        min_value=5.0,
         max_value=150.0,
         value=80.0,
         step=5.0
@@ -1120,8 +1304,13 @@ def main():
     
     fonte_dados = st.sidebar.selectbox(
         "Fonte dos Dados:",
-        ["nasa_power", "openmeteo"],
-        format_func=lambda x: "NASA Power" if x == "nasa_power" else "OpenMeteo"
+        ["nasa_power_10m", "nasa_power_50m", "openmeteo", "todos"],
+        format_func=lambda x: {
+            "nasa_power_10m": "NASA Power (10m)",
+            "nasa_power_50m": "NASA Power (50m)", 
+            "openmeteo": "OpenMeteo (10m)",
+            "todos": "Todos"
+        }.get(x, x)
     )
     
     # Período de análise
@@ -1234,7 +1423,23 @@ def main():
                 # Buscar informações das fontes de dados
                 try:
                     sources = source_repo.listar_todos()
-                    source_map = {source.name.lower(): source.id for source in sources}
+                    
+                    # Criar mapeamento correto das fontes incluindo altura
+                    source_map = {}
+                    for source in sources:
+                        fonte_nome = source.name.upper()
+                        
+                        # Mapeamento correto baseado nos nomes reais do banco
+                        if fonte_nome in ['NASA_POWER', 'NASA POWER']:
+                            # Mapear tanto para opções separadas quanto geral
+                            source_map['nasa_power'] = source.id
+                            source_map['nasa_power_10m'] = source.id  # NASA Power 10m
+                            source_map['nasa_power_50m'] = source.id  # NASA Power 50m
+                        elif fonte_nome in ['OPEN_METEO', 'OPENMETEO', 'OPEN METEO']:
+                            source_map['openmeteo'] = source.id
+                        
+                        # Também adicionar o nome original em lowercase para compatibilidade
+                        source_map[source.name.lower()] = source.id
                     
                     # Obter todas as datas disponíveis primeiro
                     todas_datas = [d.data_hora.date() for d in dados_met]
@@ -1267,16 +1472,31 @@ def main():
                         return
                     
                     # Filtrar por fonte se especificado
-                    fonte_id = source_map.get(fonte_dados.lower())
-                    if fonte_id:
-                        dados_fonte = [d for d in dados_met if d.meteorological_data_source_id == fonte_id]
-                        if dados_fonte:
-                            dados_met = dados_fonte
-                            st.success(f"✅ Usando dados da fonte {fonte_dados.upper()}: {len(dados_met)} registros")
-                        else:
-                            st.warning(f"⚠️ Dados da fonte {fonte_dados} não encontrados. Usando dados disponíveis: {len(dados_met)} registros")
-                    else:
+                    if fonte_dados.lower() == 'todos':
                         st.info(f"ℹ️ Usando todos os dados disponíveis: {len(dados_met)} registros")
+                    else:
+                        fonte_id = source_map.get(fonte_dados.lower())
+                        if fonte_id:
+                            # Filtrar por fonte
+                            dados_fonte = [d for d in dados_met if d.meteorological_data_source_id == fonte_id]
+                            
+                            # Se for uma opção específica por altura, filtrar também por altura
+                            if fonte_dados.lower() == 'nasa_power_10m':
+                                dados_fonte = [d for d in dados_fonte if float(d.altura_captura or 10.0) == 10.0]
+                                nome_fonte = "NASA Power (10m)"
+                            elif fonte_dados.lower() == 'nasa_power_50m':
+                                dados_fonte = [d for d in dados_fonte if float(d.altura_captura or 10.0) == 50.0]
+                                nome_fonte = "NASA Power (50m)"
+                            else:
+                                nome_fonte = fonte_dados.upper()
+                            
+                            if dados_fonte:
+                                dados_met = dados_fonte
+                                st.success(f"✅ Usando dados da fonte {nome_fonte}: {len(dados_met)} registros")
+                            else:
+                                st.warning(f"⚠️ Dados da fonte {nome_fonte} não encontrados. Usando todos os dados: {len(dados_met)} registros")
+                        else:
+                            st.warning(f"⚠️ Fonte {fonte_dados} não mapeada. Usando todos os dados: {len(dados_met)} registros")
                     
                     if not dados_met:
                         st.error("❌ Nenhum dado meteorológico encontrado após filtros.")
@@ -1303,19 +1523,24 @@ def main():
                 # Processar dados
                 resultados = []
                 errors_count = 0
+                print(fonte_id)
                 for i, dado in enumerate(dados_met):
                     try:
                         # Verificar se dados essenciais estão disponíveis
                         if dado.velocidade_vento is None:
                             errors_count += 1
                             continue
-                            
+
+                        # if dado.meteorological_data_source_id[i] != fonte_id:
+                        #     continue  # Pular se a fonte não corresponder
+
                         # Corrigir velocidade para altura da turbina
                         velocidade_corrigida = calcular_velocidade_corrigida(
                             float(dado.velocidade_vento),  # Converter para float
                             altura_turbina,
                             metodo_projecao,
-                            parametros
+                            parametros,
+                            float(dado.altura_captura) if dado.altura_captura else 10.0  # Altura de captura (padrão 10m
                         )
                         
                         # Calcular potência
@@ -1331,7 +1556,9 @@ def main():
                             'potencia_kw': potencia,
                             'estado_operacional': estado,
                             'temperatura': float(dado.temperatura) if dado.temperatura else None,
-                            'umidade': float(dado.umidade) if dado.umidade else None
+                            'umidade': float(dado.umidade) if dado.umidade else None,
+                            'fonte_id': dado.meteorological_data_source_id,  # Adicionar ID da fonte
+                            'altura_captura': float(dado.altura_captura) if dado.altura_captura else 10.0  # Adicionar altura de captura
                         })
                         
                     except Exception as calc_error:
@@ -1363,7 +1590,9 @@ def main():
                             'fonte': fonte_dados,
                             'periodo': periodo_dias,
                             'parametros_terreno': parametros
-                        }
+                        },
+                        'fontes_info': sources,  # Adicionar informações das fontes
+                        'dados_originais': dados_met  # Dados originais para análise por fonte e altura
                     }
                     
                     st.success("✅ Análise concluída!")
@@ -1418,7 +1647,7 @@ if __name__ == "__main__":
             st.code(traceback.format_exc())
         
         # Botões de recuperação
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns(2, border=True)
         
         with col1:
             if st.button("🔄 Recarregar Página", type="primary"):
