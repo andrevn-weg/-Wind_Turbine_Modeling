@@ -480,6 +480,90 @@ def exibir_resultados():
         except Exception:
             with col4:
                 st.metric("Fator de Capacidade", "N/A")
+        
+        # Adicionar análise de geração média por mês
+        try:
+            # Criar coluna de mês-ano para análise
+            df_resultados['mes_ano'] = pd.to_datetime(df_resultados['datetime']).dt.to_period('M')
+            
+            # Verificar se há dados de múltiplos meses
+            meses_unicos = df_resultados['mes_ano'].nunique()
+            
+            if meses_unicos > 1:
+                # Calcular média mensal de geração
+                geracao_mensal = df_resultados.groupby('mes_ano').agg({
+                    'potencia_kw': ['mean', 'sum'],
+                    'velocidade_corrigida': 'mean'
+                }).round(2)
+                
+                # Flatten column names
+                geracao_mensal.columns = ['Potência Média (kW)', 'Energia Total (kWh)', 'Velocidade Média (m/s)']
+                geracao_mensal = geracao_mensal.reset_index()
+                geracao_mensal['mes_ano_str'] = geracao_mensal['mes_ano'].astype(str)
+                
+                # Exibir seção de média mensal
+                st.markdown("---")
+                st.markdown("### 📅 Média de Geração por Mês")
+                
+                # Métricas resumidas
+                col1, col2, col3 = st.columns(3, border=True)
+                
+                with col1:
+                    media_potencia_mensal = geracao_mensal['Potência Média (kW)'].mean()
+                    st.metric(
+                        "Média Mensal de Potência",
+                        f"{media_potencia_mensal:.1f} kW",
+                        help="Média da potência média de cada mês"
+                    )
+                
+                with col2:
+                    media_energia_mensal = geracao_mensal['Energia Total (kWh)'].mean()
+                    st.metric(
+                        "Média Mensal de Energia",
+                        f"{media_energia_mensal:.0f} kWh",
+                        help="Média da energia total de cada mês"
+                    )
+                
+                with col3:
+                    melhor_mes = geracao_mensal.loc[geracao_mensal['Energia Total (kWh)'].idxmax()]
+                    st.metric(
+                        "Melhor Mês",
+                        f"{melhor_mes['mes_ano_str']}",
+                        delta=f"{melhor_mes['Energia Total (kWh)']:.0f} kWh"
+                    )
+                
+                # Tabela detalhada dos meses
+                with st.expander("📊 Detalhes por Mês"):
+                    # Formatar dados para exibição
+                    df_display = geracao_mensal.copy()
+                    df_display['Mês/Ano'] = df_display['mes_ano_str']
+                    df_display = df_display[['Mês/Ano', 'Potência Média (kW)', 'Energia Total (kWh)', 'Velocidade Média (m/s)']]
+                    
+                    st.dataframe(df_display, use_container_width=True, hide_index=True)
+                    
+                    # Gráfico de barras da energia mensal
+                    try:
+                        import plotly.express as px
+                        fig_mensal = px.bar(
+                            geracao_mensal,
+                            x='mes_ano_str',
+                            y='Energia Total (kWh)',
+                            title="Energia Total por Mês",
+                            labels={'mes_ano_str': 'Mês/Ano', 'Energia Total (kWh)': 'Energia (kWh)'},
+                            color='Energia Total (kWh)',
+                            color_continuous_scale='Viridis'
+                        )
+                        fig_mensal.update_layout(showlegend=False, coloraxis_showscale=False)
+                        fig_mensal.update_xaxes(tickangle=45)
+                        st.plotly_chart(fig_mensal, use_container_width=True)
+                    except Exception:
+                        st.info("Gráfico mensal não disponível")
+            
+            else:
+                st.info("💡 Dados de apenas um mês disponíveis. Análise mensal será exibida com mais dados.")
+                
+        except Exception as monthly_stats_error:
+            st.warning(f"⚠️ Erro ao calcular estatísticas mensais: {str(monthly_stats_error)}")
                 
     except Exception as metrics_error:
         st.error(f"❌ Erro ao calcular estatísticas: {str(metrics_error)}")
